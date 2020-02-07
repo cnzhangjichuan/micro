@@ -222,20 +222,14 @@ func (s *clients) Del(address string) {
 
 // *******************************************************************************************************
 // new client
-const connSizeInClient = 16
-
 func newClient(address string) *client {
-	const maxBuffSize = 1024
+	const connSizeInClient = 16
 
 	var c client
 	c.adr = address
 	c.enb = 1
-	for i := 0; i < connSizeInClient; i++ {
-		c.ccs[i].conn = nil
-		c.ccs[i].used = 0
-		c.ccs[i].packet = xutils.NewPacket(maxBuffSize)
-	}
-	c.wat = make(chan byte, 1)
+	c.crd = 0
+	c.mct = connSizeInClient
 	c.hsk = "GET / HTTP/1.1\r\nHost: " + address + "\r\nUpgrade: rpc\r\n\r\n"
 
 	return &c
@@ -244,8 +238,9 @@ func newClient(address string) *client {
 type client struct {
 	adr string
 	hsk string
-	ccs [connSizeInClient]con
-	wat chan byte
+	ccs chan *con
+	crd uint32
+	mct uint32
 	enb int32
 }
 
@@ -298,8 +293,12 @@ func (c *client) SetEnable(enable bool) {
 		atomic.StoreInt32(&c.enb, 1)
 	} else {
 		atomic.StoreInt32(&c.enb, 0)
-		for i := 0; i < connSizeInClient; i++ {
-			c.ccs[i].SetConn(nil)
+		for cn := range c.ccs {
+			cn.SetConn(nil)
+			select {
+			default:
+			case c.ccs <- cn:
+			}
 		}
 	}
 }
@@ -319,28 +318,33 @@ func (c *client) Put(cn *con) {
 	cn.Unused()
 	select {
 	default:
-	case c.wat <- 1:
+		cn.SetConn(nil)
+	case c.ccs <- cn:
 	}
 }
 
 func (c *client) Get() (cn *con, err error) {
+	const maxBuffSize = 1024
+
 	if !c.Enable() {
 		err = env.aut.errServiceClosed
 		return
 	}
 
 	// get from ccs
-	for {
-		for i := 0; i < connSizeInClient; i++ {
-			if c.ccs[i].Used() {
-				cn = &c.ccs[i]
-				break
+	select {
+	default:
+		if atomic.LoadUint32(&c.crd) >= atomic.LoadUint32(&c.mct) {
+			cn = <-c.ccs
+		} else {
+			atomic.AddUint32(&c.crd, 1)
+			cn = &con{
+				conn:   nil,
+				packet: xutils.NewPacket(maxBuffSize),
+				used:   0,
 			}
 		}
-		if cn != nil {
-			break
-		}
-		<-c.wat
+	case cn = <-c.ccs:
 	}
 
 	if cn.HasConn() {
