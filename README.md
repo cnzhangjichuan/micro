@@ -1,5 +1,5 @@
 # Micro
-golang for simple micro sevice. supported http, websocket, remote call by socket.
+golang for simple micro sevice. support http, websocket or remote-call.
 
 # Start simple service
 ## Register api
