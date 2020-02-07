@@ -72,6 +72,7 @@ func HandleState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logInfo("Service(%s, %s) online", id, adr)
 	env.sia.Add(adr, id)
 	env.csg.AddMicroService(id, adr)
 
@@ -89,7 +90,10 @@ func HandleState(w http.ResponseWriter, r *http.Request) {
 	// keep-alive
 	willClose := false
 	for {
-		conn.SetReadDeadline(time.Now().Add(TOM))
+		err := conn.SetReadDeadline(time.Now().Add(TOM))
+		if err != nil {
+			break
+		}
 		err = packet.ReadConn(conn)
 		if err != nil {
 			if willClose {
@@ -125,12 +129,14 @@ func HandleState(w http.ResponseWriter, r *http.Request) {
 	env.sia.Del(adr)
 	env.csg.DelMicroService(id, adr)
 
+	// Broadcast
 	packet.BeginWrite()
 	packet.WriteString(delMicro)
 	packet.WriteString(id)
 	packet.WriteString(adr)
 	packet.EndWrite()
 	env.scp.Broadcast(packet.Data())
+	logInfo("Service(%s, %s) offline", id, adr)
 }
 
 func syncState(address string) {
@@ -206,16 +212,20 @@ func syncState(address string) {
 			case pong:
 				willClose = false
 			case syncMicro:
+				logInfo("sync all services start...")
 				env.csg.SyncAllMicroService(packet)
+				logInfo("sync all services complete.")
 
 			case addMicro:
 				id := packet.ReadString()
 				adr := packet.ReadString()
+				logInfo("Service(%s, %s) online", id, adr)
 				env.csg.AddMicroService(id, adr)
 
 			case delMicro:
 				id := packet.ReadString()
 				adr := packet.ReadString()
+				logInfo("Service(%s, %s) offline", id, adr)
 				env.csg.DelMicroService(id, adr)
 
 			}

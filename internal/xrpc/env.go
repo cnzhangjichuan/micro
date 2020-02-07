@@ -34,6 +34,7 @@ func InitEnv(config *types.EnvConfig, handlers its.Handlers, logger types.Logger
 	env.handlers = handlers
 	env.log = logger
 
+	env.csg.connCacheSize = config.ConnCacheSize
 	msk := config.Mask
 	if msk == "" {
 		msk = DefaultMask

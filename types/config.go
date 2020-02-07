@@ -1,8 +1,9 @@
 package types
 
 type EnvConfig struct {
-	Id       string
-	Port     string
-	Mask     string
-	Register string
+	Id            string
+	Port          string
+	Mask          string
+	Register      string
+	ConnCacheSize int
 }

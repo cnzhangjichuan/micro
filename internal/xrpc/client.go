@@ -49,7 +49,8 @@ func LoadByAddress(result interface{}, id, address, api string, request interfac
 
 type clientsGroup struct {
 	sync.RWMutex
-	climap map[string]*clients
+	climap        map[string]*clients
+	connCacheSize int
 }
 
 func (c *clientsGroup) FindClient(id string) (cli *client, err error) {
@@ -85,7 +86,7 @@ func (c *clientsGroup) SyncAllMicroService(packet *xutils.Packet) {
 	for i := int64(0); i < count; i++ {
 		id := packet.ReadString()
 		adr := packet.ReadString()
-		logInfo("micro registered service id: %s, address: %s", id, adr)
+		logInfo("\tservice id: %s, address: %s", id, adr)
 		if s, ok := c.climap[id]; ok {
 			s.Add(adr)
 		} else {
@@ -109,7 +110,6 @@ func (c *clientsGroup) SyncAllMicroService(packet *xutils.Packet) {
 }
 
 func (c *clientsGroup) AddMicroService(id, address string) {
-	logInfo("micro register service id:%s, address: %s", id, address)
 	if id != env.id {
 		c.Lock()
 		if s, ok := c.climap[id]; ok {
@@ -126,7 +126,6 @@ func (c *clientsGroup) AddMicroService(id, address string) {
 }
 
 func (c *clientsGroup) DelMicroService(id, address string) {
-	logInfo("micro unregister service id:%s, address: %s", id, address)
 	if env.id != id {
 		c.Lock()
 		if s, ok := c.climap[id]; ok {
@@ -204,7 +203,7 @@ func (s *clients) Add(address string) {
 			return
 		}
 	}
-	s.cs = append(s.cs, newClient(address))
+	s.cs = append(s.cs, s.NewClient(address))
 	s.Unlock()
 }
 
@@ -222,14 +221,27 @@ func (s *clients) Del(address string) {
 
 // *******************************************************************************************************
 // new client
-func newClient(address string) *client {
-	const connSizeInClient = 16
+func (s *clients) NewClient(address string) *client {
+	const (
+		defaultConnCacheSize = 16
+		maxBuffSize          = 1024
+	)
 
 	var c client
 	c.adr = address
 	c.enb = 1
-	c.crd = 0
-	c.mct = connSizeInClient
+	ccs := env.csg.connCacheSize
+	if ccs <= 0 {
+		ccs = defaultConnCacheSize
+	}
+	c.ccs = make(chan *con, ccs)
+	for i := 0; i < ccs; i++ {
+		c.ccs <- &con{
+			conn:   nil,
+			packet: xutils.NewPacket(maxBuffSize),
+			used:   0,
+		}
+	}
 	c.hsk = "GET / HTTP/1.1\r\nHost: " + address + "\r\nUpgrade: rpc\r\n\r\n"
 
 	return &c
@@ -239,8 +251,6 @@ type client struct {
 	adr string
 	hsk string
 	ccs chan *con
-	crd uint32
-	mct uint32
 	enb int32
 }
 
@@ -293,11 +303,17 @@ func (c *client) SetEnable(enable bool) {
 		atomic.StoreInt32(&c.enb, 1)
 	} else {
 		atomic.StoreInt32(&c.enb, 0)
-		for cn := range c.ccs {
-			cn.SetConn(nil)
+		running := true
+		for i := 0; running && i < cap(c.ccs); i++ {
 			select {
 			default:
-			case c.ccs <- cn:
+				running = false
+			case cn := <-c.ccs:
+				cn.SetConn(nil)
+				select {
+				default:
+				case c.ccs <- cn:
+				}
 			}
 		}
 	}
@@ -324,28 +340,13 @@ func (c *client) Put(cn *con) {
 }
 
 func (c *client) Get() (cn *con, err error) {
-	const maxBuffSize = 1024
-
 	if !c.Enable() {
 		err = env.aut.errServiceClosed
 		return
 	}
 
 	// get from ccs
-	select {
-	default:
-		if atomic.LoadUint32(&c.crd) >= atomic.LoadUint32(&c.mct) {
-			cn = <-c.ccs
-		} else {
-			atomic.AddUint32(&c.crd, 1)
-			cn = &con{
-				conn:   nil,
-				packet: xutils.NewPacket(maxBuffSize),
-				used:   0,
-			}
-		}
-	case cn = <-c.ccs:
-	}
+	cn = <-c.ccs
 
 	if cn.HasConn() {
 		return
@@ -360,7 +361,6 @@ func (c *client) Get() (cn *con, err error) {
 }
 
 func (c *client) BindConn(cn *con) (err error) {
-	logInfo("micro create connection...")
 	// create new conn
 	conn, err := net.Dial("tcp", c.adr)
 	if err != nil {

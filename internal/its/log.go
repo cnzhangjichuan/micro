@@ -1,6 +1,8 @@
 package its
 
-import "fmt"
+import (
+	"log"
+)
 
 func NewDefaultLogger() *defaultLogger {
 	return &defaultLogger{}
@@ -10,9 +12,9 @@ type defaultLogger struct {
 }
 
 func (s *defaultLogger) Log(f string, v ...interface{}) {
-	fmt.Printf(f+"\n", v...)
+	log.Printf(f, v...)
 }
 
 func (s *defaultLogger) Error(f string, v ...interface{}) {
-	fmt.Printf(f+"\n", v...)
+	log.Printf(f, v...)
 }
