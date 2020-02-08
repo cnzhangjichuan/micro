@@ -29,13 +29,13 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		packet.EndWrite()
 		packet.FlushToConn(conn)
 		return
-	} else {
-		packet.BeginWrite()
-		packet.WriteByte(xPREFIX_DATA)
-		packet.WriteString(`OK`)
-		packet.EndWrite()
-		packet.FlushToConn(conn)
 	}
+
+	packet.BeginWrite()
+	packet.WriteByte(xPREFIX_DATA)
+	packet.WriteString(`OK`)
+	packet.EndWrite()
+	packet.FlushToConn(conn)
 
 	// process request
 	dpo := &rpcDpo{}
