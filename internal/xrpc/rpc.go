@@ -39,7 +39,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	// process request
 	dpo := &rpcDpo{}
-	for {
+	for err == nil {
 		err = packet.ReadConn(conn)
 		if err != nil {
 			break
