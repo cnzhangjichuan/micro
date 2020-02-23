@@ -7,7 +7,8 @@ import (
 // data process object
 type Dpo interface {
 	Request(interface{}) error
-	Response(resp interface{})
+	Response(interface{})
+	FileName(string)
 	GetUser() User
 	BindUser(User)
 	UnBindUser()
@@ -16,7 +17,7 @@ type Dpo interface {
 	ProcessFile(string, func(multipart.File, *multipart.FileHeader) error) error
 	SetRoom(string)
 	Close()
-	SendMessage(message interface{}, user... string)
+	SendMessage(message interface{}, user ...string)
 	SendRoomMessage(interface{})
 	Proxy(string) error
 }

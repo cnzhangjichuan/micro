@@ -9,6 +9,7 @@ type BaseDpo struct{}
 
 func (b *BaseDpo) Request(v interface{}) error                     { return nil }
 func (b *BaseDpo) Response(resp interface{})                       {}
+func (b *BaseDpo) FileName(fileName string)                        {}
 func (b *BaseDpo) GetUser() types.User                             { return nil }
 func (b *BaseDpo) BindUser(u types.User)                           {}
 func (b *BaseDpo) UnBindUser()                                     {}

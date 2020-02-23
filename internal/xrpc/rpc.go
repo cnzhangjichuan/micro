@@ -53,9 +53,9 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 			_, err = packet.FlushToConn(conn)
 			continue
 		}
+
 		dpo.data = packet.Data()
-		err = handler.Func(dpo)
-		if err != nil {
+		if err = handler.Func(dpo); err != nil {
 			packet.BeginWrite()
 			packet.WriteByte(xPREFIX_ERR)
 			packet.WriteString(err.Error())

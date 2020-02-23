@@ -21,6 +21,7 @@ type httpDpo struct {
 	r       *http.Request
 	reqData []byte
 	user    types.User
+	df      string
 	resp    interface{}
 }
 
@@ -46,6 +47,10 @@ func (h *httpDpo) UnBindUser() {
 
 func (h *httpDpo) Response(resp interface{}) {
 	h.resp = resp
+}
+
+func (h *httpDpo) FileName(fileName string) {
+	h.df = fileName
 }
 
 func (h *httpDpo) DeleteFile(name string) error {

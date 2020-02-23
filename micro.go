@@ -110,3 +110,16 @@ func SendMessage(message interface{}, userId ...string) {
 func SendRoomMessage(message interface{}, room string) {
 	xwsk.SendRoomMessage(message, room)
 }
+
+// ====================================================================================================
+// api for event-source
+
+// push event-source
+func PushEventSource(v interface{}, users ...string) bool {
+	return xhttp.PushEventSource(v, users...)
+}
+
+// close pusher
+func CloseEventSource(uid string) {
+	xhttp.CloseEventSource(uid)
+}
