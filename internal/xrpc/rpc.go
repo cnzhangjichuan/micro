@@ -3,9 +3,12 @@ package xrpc
 import (
 	"github.com/cnzhangjichuan/micro/xutils"
 	"net/http"
+	"time"
 )
 
 func Handle(w http.ResponseWriter, r *http.Request) {
+	const TOM = time.Second * 10
+
 	conn, _, err := w.(http.Hijacker).Hijack()
 
 	if err != nil {
@@ -14,6 +17,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	conn.SetReadDeadline(time.Time{})
 	// verification
 	ac := env.aut.Create()
 	packet := xutils.NewPacket(1024)
@@ -50,6 +54,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 			packet.WriteByte(xPREFIX_ERR)
 			packet.WriteString(`服务不存在或已删除`)
 			packet.EndWrite()
+			conn.SetWriteDeadline(time.Now().Add(TOM))
 			_, err = packet.FlushToConn(conn)
 			continue
 		}
@@ -60,6 +65,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 			packet.WriteByte(xPREFIX_ERR)
 			packet.WriteString(err.Error())
 			packet.EndWrite()
+			conn.SetWriteDeadline(time.Now().Add(TOM))
 			_, err = packet.FlushToConn(conn)
 			continue
 		}
@@ -70,6 +76,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 			packet.WriteByte(xPREFIX_ERR)
 			packet.WriteString(err.Error())
 			packet.EndWrite()
+			conn.SetWriteDeadline(time.Now().Add(TOM))
 			_, err = packet.FlushToConn(conn)
 			continue
 		}
@@ -78,6 +85,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		packet.WriteByte(xPREFIX_DATA)
 		packet.Write(resp)
 		packet.EndWrite()
+		conn.SetWriteDeadline(time.Now().Add(TOM))
 		_, err = packet.FlushToConn(conn)
 	}
 }

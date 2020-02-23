@@ -35,72 +35,64 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 // process event-source interface.
 func handleEventSource(w http.ResponseWriter, uid string) {
-	w.Header().Set(`Content-Type`, `text/event-stream`)
-	w.Header().Set(`"Access-Control-Allow-Origin`, `*`)
+	const TOM = time.Second * 5
 
 	// user
 	if uid == "" {
 		logError("not found logon user")
-		// not found handler
-		// set response data type
-		w.Write(xutils.UnsafeStringToBytes("retry: 3600s\ndata: {\"Error\":\"no login\"}\n\n"))
 		return
 	}
 
-	flusher, _ := w.(http.Flusher)
+	conn, _, err := w.(http.Hijacker).Hijack()
+	if err != nil {
+		logError("event-source hijacking [%s] error: %v", err)
+		return
+	}
+	defer conn.Close()
+
+	// response header
+	conn.SetWriteDeadline(time.Now().Add(TOM))
+	_, err = conn.Write(env.esp.handshake)
 
 	// retry settings
-	w.Write(xutils.UnsafeStringToBytes("retry: 10s\n\n"))
-	flusher.Flush()
+	w.Write(xutils.UnsafeStringToBytes("retry:10s\n\n"))
 
 	// push data
 	var (
 		msgChan = make(chan interface{}, 10)
 		timer   = time.NewTicker(time.Second * 30)
-		running = true
+		rowData []byte
 	)
 
-	processMessage := func(msg interface{}) error {
-		data, err := xutils.MarshalJson(msg)
-		if err != nil {
-			return err
-		}
-		if bytes.Equal(data, env.ep.closer) {
-			w.Write(env.ep.header)
-			w.Write(env.ep.closer)
-			w.Write(env.ep.footer)
-			flusher.Flush()
-			return env.ep.closeErr
-		}
-		if _, err = w.Write(env.ep.header); err != nil {
-			return err
-		}
-		if _, err = w.Write(data); err != nil {
-			return err
-		}
-		if _, err = w.Write(env.ep.footer); err != nil {
-			return err
-		}
-		flusher.Flush()
-		return nil
-	}
-
 	env.esp.Set(uid, msgChan)
-	for running {
+	for {
+		rowData = nil
 		select {
 		case <-timer.C:
-			_, err := w.Write(env.ep.heartbeat)
-			if err != nil {
-				running = false
-				logError("push data error %v", err)
-			}
+			rowData = env.esp.heartbeat
 		case msg := <-msgChan:
-			if msg == nil {
-				running = false
-			} else if err := processMessage(msg); err != nil {
-				running = false
-				logError("push data error %v", err)
+			if msg != nil {
+				rowData, err = xutils.MarshalJson(msg)
+				if err == nil {
+					rowData = bytes.Join([][]byte{env.esp.header, rowData, env.esp.footer}, nil)
+				}
 			}
+		}
+		if rowData == nil || err != nil {
+			break
+		}
+
+		conn.SetWriteDeadline(time.Now().Add(TOM))
+		// close
+		if bytes.Equal(rowData, env.esp.closer) {
+			conn.Write(env.esp.closer)
+			break
+		}
+
+		// data
+		if _, err = conn.Write(rowData); err != nil {
+			logError("push data error %v", err)
+			break
 		}
 	}
 	timer.Stop()
@@ -109,14 +101,21 @@ func handleEventSource(w http.ResponseWriter, uid string) {
 
 // process static file.
 func handleResource(w http.ResponseWriter, r *http.Request, path string) {
-	const SHARE = `/share`
+	const (
+		SHARE    = `/share`
+		APPCACHE = `.appcache`
+	)
 
 	if path == "" || path == "/" {
 		r.URL.Path = "/app.html"
 	}
-	if strings.HasPrefix(path, SHARE) {
+	switch {
+	case strings.HasSuffix(path, APPCACHE):
+		w.Header().Set("Content-Type", "text/cache-manifest")
+	case strings.HasPrefix(path, SHARE):
 		w.Header().Set("Content-Type", "application/octet-stream")
 	}
+
 	env.fs.ServeHTTP(w, r)
 }
 

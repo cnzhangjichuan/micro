@@ -16,15 +16,6 @@ var env struct {
 	esp      espool
 	assets   string
 	fs       http.Handler
-	ep       eventParam
-}
-
-type eventParam struct {
-	header    []byte
-	footer    []byte
-	heartbeat []byte
-	closer    []byte
-	closeErr  error
 }
 
 // init env
@@ -36,12 +27,6 @@ func InitEnv(config *types.EnvConfig, handlers its.Handlers, log types.Logger) {
 	env.fs = http.FileServer(http.Dir(env.assets))
 	env.log = log
 	env.handlers = handlers
-
-	env.ep.header = []byte("data: ")
-	env.ep.footer = []byte("\n\n")
-	env.ep.heartbeat = []byte(":hbt")
-	env.ep.closer = []byte("CLOSE")
-	env.ep.closeErr = xutils.NewError("Shutdown pusher by server.")
 }
 
 // Init user pool
@@ -68,6 +53,11 @@ func initPool(up *userPool, maxTimeout int64, esp *espool) {
 	esp.p6 = make(map[string]chan interface{}, MAP_CAP)
 	esp.p7 = make(map[string]chan interface{}, MAP_CAP)
 	esp.p8 = make(map[string]chan interface{}, MAP_CAP)
+	esp.handshake = []byte("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nAccess-Control-Allow-Origin: *\r\n\r\n")
+	esp.header = []byte("data:")
+	esp.footer = []byte("\n\n")
+	esp.heartbeat = []byte("id:0\n\n")
+	esp.closer = []byte("data:CLOSE\n\n")
 }
 
 // log for error
@@ -306,6 +296,12 @@ func (up *userPool) gc(maxTimeout int64) {
 }
 
 type espool struct {
+	handshake []byte
+	header    []byte
+	footer    []byte
+	heartbeat []byte
+	closer    []byte
+
 	m1 sync.RWMutex
 	p1 map[string]chan interface{}
 
@@ -465,7 +461,7 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 				}
 			}
 			env.esp.m1.RUnlock()
-		} ()
+		}()
 
 		go func() {
 			env.esp.m2.RLock()
@@ -477,7 +473,7 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 				}
 			}
 			env.esp.m2.RUnlock()
-		} ()
+		}()
 
 		go func() {
 			env.esp.m3.RLock()
@@ -489,7 +485,7 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 				}
 			}
 			env.esp.m3.RUnlock()
-		} ()
+		}()
 
 		go func() {
 			env.esp.m4.RLock()
@@ -501,7 +497,7 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 				}
 			}
 			env.esp.m4.RUnlock()
-		} ()
+		}()
 
 		go func() {
 			env.esp.m5.RLock()
@@ -513,7 +509,7 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 				}
 			}
 			env.esp.m5.RUnlock()
-		} ()
+		}()
 
 		go func() {
 			env.esp.m6.RLock()
@@ -525,7 +521,7 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 				}
 			}
 			env.esp.m6.RUnlock()
-		} ()
+		}()
 
 		go func() {
 			env.esp.m7.RLock()
@@ -537,7 +533,7 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 				}
 			}
 			env.esp.m7.RUnlock()
-		} ()
+		}()
 
 		go func() {
 			env.esp.m8.RLock()
@@ -549,7 +545,7 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 				}
 			}
 			env.esp.m8.RUnlock()
-		} ()
+		}()
 
 	} else {
 		for _, uid := range users {
@@ -641,5 +637,5 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 }
 
 func CloseEventSource(uid string) {
-	PushEventSource(env.ep.closer, uid)
+	PushEventSource(env.esp.closer, uid)
 }
