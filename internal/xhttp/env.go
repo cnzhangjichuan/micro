@@ -58,6 +58,7 @@ func initPool(up *userPool, maxTimeout int64, esp *espool) {
 	esp.footer = []byte("\n\n")
 	esp.heartbeat = []byte("id:0\n\n")
 	esp.closer = []byte("data:CLOSE\n\n")
+	esp.retry = []byte("retry:10s\n\n")
 }
 
 // log for error
@@ -301,6 +302,7 @@ type espool struct {
 	footer    []byte
 	heartbeat []byte
 	closer    []byte
+	retry     []byte
 
 	m1 sync.RWMutex
 	p1 map[string]chan interface{}

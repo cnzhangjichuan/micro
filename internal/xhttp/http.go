@@ -45,23 +45,30 @@ func handleEventSource(w http.ResponseWriter, uid string) {
 
 	conn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
-		logError("event-source hijacking [%s] error: %v", err)
+		logError("event-source hijacking error: %v", err)
 		return
 	}
 	defer conn.Close()
 
 	// response header
 	conn.SetWriteDeadline(time.Now().Add(TOM))
-	_, err = conn.Write(env.esp.handshake)
+	if _, err = conn.Write(env.esp.handshake); err != nil {
+		logError("event-source handshake error: %v", err)
+		return
+	}
 
 	// retry settings
-	w.Write(xutils.UnsafeStringToBytes("retry:10s\n\n"))
+	if _, err = conn.Write(env.esp.retry); err != nil {
+		logError("event-source set retry error: %v", err)
+		return
+	}
 
 	// push data
 	var (
-		msgChan = make(chan interface{}, 10)
-		timer   = time.NewTicker(time.Second * 30)
-		rowData []byte
+		msgChan   = make(chan interface{}, 10)
+		timer     = time.NewTicker(time.Second * 30)
+		rowData   []byte
+		isClosing = false
 	)
 
 	env.esp.Set(uid, msgChan)
@@ -74,7 +81,10 @@ func handleEventSource(w http.ResponseWriter, uid string) {
 			if msg != nil {
 				rowData, err = xutils.MarshalJson(msg)
 				if err == nil {
-					rowData = bytes.Join([][]byte{env.esp.header, rowData, env.esp.footer}, nil)
+					isClosing = bytes.Equal(rowData, env.esp.closer)
+					if !isClosing {
+						rowData = bytes.Join([][]byte{env.esp.header, rowData, env.esp.footer}, nil)
+					}
 				}
 			}
 		}
@@ -84,8 +94,8 @@ func handleEventSource(w http.ResponseWriter, uid string) {
 
 		conn.SetWriteDeadline(time.Now().Add(TOM))
 		// close
-		if bytes.Equal(rowData, env.esp.closer) {
-			conn.Write(env.esp.closer)
+		if isClosing {
+			conn.Write(rowData)
 			break
 		}
 
