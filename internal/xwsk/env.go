@@ -11,6 +11,8 @@ var env struct {
 	handlers its.Handlers
 	log      types.Logger
 	sds      wsDps
+	ping     []byte
+	pong     []byte
 }
 
 func InitEnv(config *types.EnvConfig, handlers its.Handlers, logger types.Logger) {
@@ -26,6 +28,8 @@ func InitEnv(config *types.EnvConfig, handlers its.Handlers, logger types.Logger
 	env.sds.g6 = make(map[string]*wsDpo, MAP_CAP)
 	env.sds.g7 = make(map[string]*wsDpo, MAP_CAP)
 	env.sds.g8 = make(map[string]*wsDpo, MAP_CAP)
+	env.ping = []byte{0x89, 0x00}
+	env.pong = []byte{0x8a, 0x00}
 }
 
 // log for error

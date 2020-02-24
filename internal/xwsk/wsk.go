@@ -7,6 +7,7 @@ import (
 	"github.com/cnzhangjichuan/micro/xutils"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -86,6 +87,8 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 			// send data
 			if err != nil {
+				d := xutils.UnsafeStringToBytes(`{"Error":"` + strings.Replace(err.Error(), `"`, `'`, -1) + `"}`)
+				dpo.putResponseData(dpo.encodingResponseData(d))
 				continue
 			}
 			if dpo.resp == nil {

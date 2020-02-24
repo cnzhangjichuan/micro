@@ -14,6 +14,11 @@ import (
 
 // server
 func Service(config types.EnvConfig) error {
+	const (
+		DefaultReadTimeout  = time.Second * 10
+		DefaultWriteTimeout = time.Second * 20
+	)
+
 	// init env
 	if err := initEnv(&config); err != nil {
 		return err
@@ -29,39 +34,21 @@ func Service(config types.EnvConfig) error {
 	// init web-socket
 	xwsk.InitEnv(&config, env.handlers, env.log)
 
+	if config.ReadTimeout == 0 {
+		config.ReadTimeout = DefaultReadTimeout
+	}
+	if config.WriteTimeout == 0 {
+		config.WriteTimeout = DefaultWriteTimeout
+	}
+
 	srv := http.Server{
 		Addr:         ":" + env.port,
-		ReadTimeout:  time.Second * 10,
-		WriteTimeout: time.Second * 20,
-		Handler:      &routerHandler{},
+		ReadTimeout:  config.ReadTimeout,
+		WriteTimeout: config.WriteTimeout,
+		Handler:      &dispatcherHandler{},
 	}
 
 	return srv.ListenAndServe()
-}
-
-type routerHandler struct{}
-
-func (rh *routerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	const (
-		WSK = `websocket`
-		RPC = `rpc`
-		STA = `sta`
-	)
-
-	switch r.Header.Get("Upgrade") {
-	default:
-		xhttp.Handle(w, r)
-
-	case WSK:
-		xwsk.Handle(w, r)
-
-	case RPC:
-		xrpc.Handle(w, r)
-
-	case STA:
-		xrpc.HandleState(w, r)
-
-	}
 }
 
 // register

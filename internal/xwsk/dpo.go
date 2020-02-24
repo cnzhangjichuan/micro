@@ -84,7 +84,7 @@ func (w *wsDpo) loadDataFromConn(conn net.Conn) (ok bool, err error) {
 			if e, ok := err.(net.Error); ok && e.Timeout() {
 				w.wClose = true
 				// ping
-				conn.Write([]byte{0x89, 0x00})
+				conn.Write(env.ping)
 				continue
 			}
 			return
@@ -132,7 +132,7 @@ func (w *wsDpo) loadDataFromConn(conn net.Conn) (ok bool, err error) {
 			err = xErrCloseByClient
 			return
 		case 9: // ping
-			conn.Write([]byte{0x8a, 0x00})
+			conn.Write(env.pong)
 			return
 		case 10: //pong
 			return

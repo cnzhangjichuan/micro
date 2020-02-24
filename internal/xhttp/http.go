@@ -35,7 +35,10 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 // process event-source interface.
 func handleEventSource(w http.ResponseWriter, uid string) {
-	const TOM = time.Second * 5
+	const (
+		TOM    = time.Second * 5
+		TICKER = time.Minute
+	)
 
 	// user
 	if uid == "" {
@@ -50,7 +53,7 @@ func handleEventSource(w http.ResponseWriter, uid string) {
 	}
 	defer conn.Close()
 
-	// response header
+	// handshake
 	conn.SetWriteDeadline(time.Now().Add(TOM))
 	if _, err = conn.Write(env.esp.handshake); err != nil {
 		logError("event-source handshake error: %v", err)
@@ -66,45 +69,47 @@ func handleEventSource(w http.ResponseWriter, uid string) {
 	// push data
 	var (
 		msgChan   = make(chan interface{}, 10)
-		timer     = time.NewTicker(time.Second * 30)
-		rowData   []byte
+		timer     = time.NewTicker(TICKER)
+		packet    []byte
 		isClosing = false
 	)
 
 	env.esp.Set(uid, msgChan)
 	for {
-		rowData = nil
+		packet = nil
 		select {
 		case <-timer.C:
-			rowData = env.esp.heartbeat
+			packet = env.esp.heartbeat
 		case msg := <-msgChan:
 			if msg != nil {
-				rowData, err = xutils.MarshalJson(msg)
+				packet, err = xutils.MarshalJson(msg)
 				if err == nil {
-					isClosing = bytes.Equal(rowData, env.esp.closer)
+					isClosing = bytes.Equal(packet, env.esp.closer)
 					if !isClosing {
-						rowData = bytes.Join([][]byte{env.esp.header, rowData, env.esp.footer}, nil)
+						packet = bytes.Join([][]byte{env.esp.header, packet, env.esp.footer}, nil)
 					}
 				}
 			}
 		}
-		if rowData == nil || err != nil {
+		if packet == nil || err != nil {
 			break
 		}
 
 		conn.SetWriteDeadline(time.Now().Add(TOM))
 		// close
 		if isClosing {
-			conn.Write(rowData)
+			conn.Write(packet)
 			break
 		}
 
 		// data
-		if _, err = conn.Write(rowData); err != nil {
+		if _, err = conn.Write(packet); err != nil {
 			logError("push data error %v", err)
 			break
 		}
 	}
+
+	// release resource
 	timer.Stop()
 	env.esp.Del(uid, msgChan)
 }

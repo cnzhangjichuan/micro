@@ -57,8 +57,11 @@ func initPool(up *userPool, maxTimeout int64, esp *espool) {
 	esp.header = []byte("data:")
 	esp.footer = []byte("\n\n")
 	esp.heartbeat = []byte("id:0\n\n")
-	esp.closer = []byte("data:CLOSE\n\n")
-	esp.retry = []byte("retry:10s\n\n")
+	// turn off the logo and
+	// set it up for an hour before reconnecting
+	esp.closer = []byte("retry:3600000\ndata:CLOSE\n\n")
+	// reconnect in 10 seconds
+	esp.retry = []byte("retry:10000\n\n")
 }
 
 // log for error
@@ -553,85 +556,101 @@ func PushEventSource(v interface{}, users ...string) (ret bool) {
 		for _, uid := range users {
 			switch xutils.HashCode32(uid) % 8 {
 			default:
-				env.esp.m8.RLock()
-				if c, ok := env.esp.p8[uid]; ok {
-					select {
-					default:
-					case c <- v:
-						ret = true
+				go func(uid string) {
+					env.esp.m8.RLock()
+					if c, ok := env.esp.p8[uid]; ok {
+						select {
+						default:
+						case c <- v:
+							ret = true
+						}
 					}
-				}
-				env.esp.m8.RUnlock()
+					env.esp.m8.RUnlock()
+				}(uid)
 			case 0:
-				env.esp.m1.RLock()
-				if c, ok := env.esp.p1[uid]; ok {
-					select {
-					default:
-					case c <- v:
-						ret = true
+				go func(uid string) {
+					env.esp.m1.RLock()
+					if c, ok := env.esp.p1[uid]; ok {
+						select {
+						default:
+						case c <- v:
+							ret = true
+						}
 					}
-				}
-				env.esp.m1.RUnlock()
+					env.esp.m1.RUnlock()
+				}(uid)
 			case 1:
-				env.esp.m2.RLock()
-				if c, ok := env.esp.p2[uid]; ok {
-					select {
-					default:
-					case c <- v:
-						ret = true
+				go func(uid string) {
+					env.esp.m2.RLock()
+					if c, ok := env.esp.p2[uid]; ok {
+						select {
+						default:
+						case c <- v:
+							ret = true
+						}
 					}
-				}
-				env.esp.m2.RUnlock()
+					env.esp.m2.RUnlock()
+				}(uid)
 			case 2:
-				env.esp.m3.RLock()
-				if c, ok := env.esp.p3[uid]; ok {
-					select {
-					default:
-					case c <- v:
-						ret = true
+				go func(uid string) {
+					env.esp.m3.RLock()
+					if c, ok := env.esp.p3[uid]; ok {
+						select {
+						default:
+						case c <- v:
+							ret = true
+						}
 					}
-				}
-				env.esp.m3.RUnlock()
+					env.esp.m3.RUnlock()
+				}(uid)
 			case 3:
-				env.esp.m4.RLock()
-				if c, ok := env.esp.p4[uid]; ok {
-					select {
-					default:
-					case c <- v:
-						ret = true
+				go func(uid string) {
+					env.esp.m4.RLock()
+					if c, ok := env.esp.p4[uid]; ok {
+						select {
+						default:
+						case c <- v:
+							ret = true
+						}
 					}
-				}
-				env.esp.m4.RUnlock()
+					env.esp.m4.RUnlock()
+				}(uid)
 			case 4:
-				env.esp.m5.RLock()
-				if c, ok := env.esp.p5[uid]; ok {
-					select {
-					default:
-					case c <- v:
-						ret = true
+				go func(uid string) {
+					env.esp.m5.RLock()
+					if c, ok := env.esp.p5[uid]; ok {
+						select {
+						default:
+						case c <- v:
+							ret = true
+						}
 					}
-				}
-				env.esp.m5.RUnlock()
+					env.esp.m5.RUnlock()
+				}(uid)
 			case 5:
-				env.esp.m6.RLock()
-				if c, ok := env.esp.p6[uid]; ok {
-					select {
-					default:
-					case c <- v:
-						ret = true
+				go func(uid string) {
+					env.esp.m6.RLock()
+					if c, ok := env.esp.p6[uid]; ok {
+						select {
+						default:
+						case c <- v:
+							ret = true
+						}
 					}
-				}
-				env.esp.m6.RUnlock()
+					env.esp.m6.RUnlock()
+				}(uid)
 			case 6:
-				env.esp.m7.RLock()
-				if c, ok := env.esp.p7[uid]; ok {
-					select {
-					default:
-					case c <- v:
-						ret = true
+				go func(uid string) {
+					env.esp.m7.RLock()
+					if c, ok := env.esp.p7[uid]; ok {
+						select {
+						default:
+						case c <- v:
+							ret = true
+						}
 					}
-				}
-				env.esp.m7.RUnlock()
+					env.esp.m7.RUnlock()
+				}(uid)
 			}
 		}
 	}

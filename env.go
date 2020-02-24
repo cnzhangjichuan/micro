@@ -2,8 +2,12 @@ package micro
 
 import (
 	"github.com/cnzhangjichuan/micro/internal/its"
+	"github.com/cnzhangjichuan/micro/internal/xhttp"
+	"github.com/cnzhangjichuan/micro/internal/xrpc"
+	"github.com/cnzhangjichuan/micro/internal/xwsk"
 	"github.com/cnzhangjichuan/micro/types"
 	"net"
+	"net/http"
 )
 
 // setter logger
@@ -81,4 +85,29 @@ func initEnv(config *types.EnvConfig) error {
 		break
 	}
 	return nil
+}
+
+type dispatcherHandler struct{}
+
+func (rh *dispatcherHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	const (
+		WSK = `websocket`
+		RPC = `rpc`
+		STA = `sta`
+	)
+
+	switch r.Header.Get("Upgrade") {
+	default:
+		xhttp.Handle(w, r)
+
+	case WSK:
+		xwsk.Handle(w, r)
+
+	case RPC:
+		xrpc.Handle(w, r)
+
+	case STA:
+		xrpc.HandleState(w, r)
+
+	}
 }
