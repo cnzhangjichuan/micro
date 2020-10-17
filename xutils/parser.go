@@ -106,11 +106,11 @@ func ParseI64S(s string) (ret []int64) {
 
 // ParseU32 将string转成uint32
 func ParseU32(s string, def uint32) uint32 {
-	i, err := strconv.ParseInt(s, 10, 32)
+	u, err := strconv.ParseUint(s, 10, 32)
 	if err != nil {
 		return def
 	}
-	return uint32(i)
+	return uint32(u)
 }
 
 // ParseU32S 使用;将字符串分隔成[]uint32
@@ -129,11 +129,11 @@ func ParseU32S(s string) (ret []uint32) {
 
 // ParseU64 将string转成uint64
 func ParseU64(s string, def uint64) uint64 {
-	i, err := strconv.ParseInt(s, 10, 64)
+	u, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
 		return def
 	}
-	return uint64(i)
+	return u
 }
 
 // ParseU64S 使用;将字符串分隔成[]uint64
@@ -337,7 +337,7 @@ func AddNoRepeatItem(ss []string, s string) []string {
 // AddFirstItem 将元素加到队列首位
 func AddFirstItem(ss []string, s string) []string {
 	ss = append(ss, "")
-	for i := len(ss)-1; i > 0; i-- {
+	for i := len(ss) - 1; i > 0; i-- {
 		ss[i] = ss[i-1]
 	}
 	ss[0] = s

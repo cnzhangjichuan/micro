@@ -18,14 +18,21 @@ type Dpo interface {
 	// SetUser 设置角色数据
 	SetUser(packet.PackIdentifier)
 
+	// GetUID 获取UID
 	GetUID() string
 
-	// GetCache 设置缓存数据，
+	// GetCache 设置缓存数据
 	// 该数据在会话中一直有效，直到会话结束或被删除
 	SetCache(string, interface{})
 
 	// GetString 从设置的缓存中获取数据
 	GetString(string) (string, bool)
+
+	// GetI32 从设置的缓存中获取数据
+	GetI32(string) (int32, bool)
+
+	// GetI64 从设置的缓存中获取数据
+	GetI64(string) (int64, bool)
 
 	// GetU32 从设置的缓存中获取数据
 	GetU32(string) (uint32, bool)
@@ -34,12 +41,12 @@ type Dpo interface {
 	GetU64(string) (uint64, bool)
 
 	// GetFloat32 从设置的缓存中获取数据
-	GetFloat32(string) (float32, bool)
+	GetF32(string) (float32, bool)
 
 	// GetFloat64 从设置的缓存中获取数据
-	GetFloat64(string) (float64, bool)
+	GetF64(string) (float64, bool)
 
-	// GetU32 从设置的缓存中获取数据
+	// GetCache 从设置的缓存中获取数据
 	GetCache(string) (interface{}, bool)
 
 	// DelCache 删除缓存
@@ -114,6 +121,22 @@ func (b *baseDpo) GetString(key string) (string, bool) {
 	s, ok := v.(string)
 	return s, ok
 }
+func (b *baseDpo) GetI32(key string) (int32, bool) {
+	v, ok := b.GetCache(key)
+	if !ok {
+		return 0, false
+	}
+	u, ok := v.(int32)
+	return u, ok
+}
+func (b *baseDpo) GetI64(key string) (int64, bool) {
+	v, ok := b.GetCache(key)
+	if !ok {
+		return 0, false
+	}
+	u, ok := v.(int64)
+	return u, ok
+}
 func (b *baseDpo) GetU32(key string) (uint32, bool) {
 	v, ok := b.GetCache(key)
 	if !ok {
@@ -130,7 +153,7 @@ func (b *baseDpo) GetU64(key string) (uint64, bool) {
 	u, ok := v.(uint64)
 	return u, ok
 }
-func (b *baseDpo) GetFloat32(key string) (float32, bool) {
+func (b *baseDpo) GetF32(key string) (float32, bool) {
 	v, ok := b.GetCache(key)
 	if !ok {
 		return 0, false
@@ -138,7 +161,7 @@ func (b *baseDpo) GetFloat32(key string) (float32, bool) {
 	f, ok := v.(float32)
 	return f, ok
 }
-func (b *baseDpo) GetFloat64(key string) (float64, bool) {
+func (b *baseDpo) GetF64(key string) (float64, bool) {
 	v, ok := b.GetCache(key)
 	if !ok {
 		return 0, false
