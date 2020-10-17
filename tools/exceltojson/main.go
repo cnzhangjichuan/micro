@@ -14,7 +14,7 @@ import (
 func main() {
 	const (
 		src = `./总表.xlsx`
-		dst = `./configs`
+		dst = `../assets/script/service/configs`
 	)
 
 	// 创建目录
