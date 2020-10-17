@@ -1,122 +1,94 @@
 package micro
 
 import (
-	"github.com/cnzhangjichuan/micro/internal/its"
-	"github.com/cnzhangjichuan/micro/internal/xhttp"
-	"github.com/cnzhangjichuan/micro/internal/xrpc"
-	"github.com/cnzhangjichuan/micro/internal/xwsk"
-	"github.com/cnzhangjichuan/micro/types"
-	"github.com/cnzhangjichuan/micro/xutils"
-	"net/http"
-	"runtime"
-	"time"
+	"os"
+	"strings"
 )
 
-// server
-func Service(config types.EnvConfig) error {
-	const (
-		DefaultReadTimeout  = time.Second * 10
-		DefaultWriteTimeout = time.Second * 20
-	)
-
-	// init env
-	if err := initEnv(&config); err != nil {
-		return err
-	}
-	Log("Service[%s] started on %s", Id(), Address())
-
-	// init http
-	xhttp.InitEnv(&config, env.handlers, env.log)
-
-	// init rpc
-	xrpc.InitEnv(&config, env.handlers, env.log)
-
-	// init web-socket
-	xwsk.InitEnv(&config, env.handlers, env.log)
-
-	if config.ReadTimeout == 0 {
-		config.ReadTimeout = DefaultReadTimeout
-	}
-	if config.WriteTimeout == 0 {
-		config.WriteTimeout = DefaultWriteTimeout
+// Service 开启服务
+func Service(onStartup func()) error {
+	var cmd, op, param string
+	for i := 1; i < len(os.Args); i++ {
+		if os.Args[i-1] == "-s" {
+			cmd = strings.TrimSpace(os.Args[i])
+			if len(os.Args) > i+1 {
+				op = os.Args[i+1]
+			}
+			if len(os.Args) > i+2 {
+				param = os.Args[i+2]
+			}
+			break
+		}
 	}
 
-	srv := http.Server{
-		Addr:         ":" + env.port,
-		ReadTimeout:  config.ReadTimeout,
-		WriteTimeout: config.WriteTimeout,
-		Handler:      &dispatcherHandler{},
-	}
+	switch cmd {
+	default:
+		// 启动服务
+		return startupService(onStartup)
 
-	return srv.ListenAndServe()
-}
+	case `reload`:
+		// 重载服务配置
+		return requestReloadService()
 
-// register
-func Register(api string, permit string, f func(types.Dpo) error) {
-	env.handlers[api] = &its.Handler{
-		Permit: permit,
-		Func: func(dpo types.Dpo) (err error) {
-			defer func() {
-				if ems := recover(); ems != nil {
-					if env.log != nil {
-						buf := make([]byte, 1024)
-						buf = buf[:runtime.Stack(buf, false)]
-						Error("hande [%s] error: %v\n%s\n\n", api, ems, buf)
-					}
-					err = xutils.NewError(ems)
-				}
-			}()
-			err = f(dpo)
-			return
-		},
+	case `stop`:
+		// 关闭服务
+		return requestCloseService()
+
+	case `upload`:
+		// 上传文件
+		return requestUploadService(op, param)
+
+	case `help`:
+		Log("\n" +
+			"-s start: startup service\n" +
+			"-s stop: shutdown running service\n" +
+			"-s reload: reload config file\n" +
+			"-s upload: upload file\n")
+		return nil
 	}
 }
 
-// service id
-func Id() string {
-	return env.id
+// SendDataAll 给所有远端发送数据
+func SendDataAll(data interface{}, api string) {
+	SendDataWithUIDs(data, api, nil)
 }
 
-// service address
-func Address() string {
-	return env.address
+// SendDataWithUIDs 给指定的UIDs远端发送数据
+func SendDataWithUIDs(data interface{}, api string, uids []string) {
+	for _, m := range env.chains {
+		m.SendData(data, api, uids)
+	}
 }
 
-// ====================================================================================================
-// api for rpc.
-
-// load data
-func Load(result interface{}, id, api string, request interface{}) error {
-	return xrpc.Load(result, id, api, request)
+// SendDataWithGroup 按组分发数据
+func SendDataWithGroup(data interface{}, api string, flag uint8, group string) {
+	for _, m := range env.chains {
+		m.SendGroup(data, api, flag, group)
+	}
 }
 
-// load data
-func LoadByAddress(result interface{}, id, address, api string, request interface{}) error {
-	return xrpc.LoadByAddress(result, id, address, api, request)
+// RPC 远端调用
+func RPC(out, in interface{}, srvName, api string) error {
+	adr := env.registry.ServerAddress(srvName)
+	if adr == "" {
+		return errRPCNotFoundService
+	}
+
+	return env.rpc.Call(out, in, adr, api)
 }
 
-// ====================================================================================================
-// api for web-socket.
+const (
+	// StaBUSY 服务器状态：繁忙状态
+	StaBUSY = 1
+	// StaCLOSE 服务状态：维护中
+	StaCLOSE = 2
+)
 
-// SendMessage
-func SendMessage(message interface{}, userId ...string) {
-	xwsk.SendMessage(message, userId...)
-}
-
-// SendRoomMessage
-func SendRoomMessage(message interface{}, room string) {
-	xwsk.SendRoomMessage(message, room)
-}
-
-// ====================================================================================================
-// api for event-source
-
-// push event-source
-func PushEventSource(v interface{}, users ...string) bool {
-	return xhttp.PushEventSource(v, users...)
-}
-
-// close pusher
-func CloseEventSource(uid string) {
-	xhttp.CloseEventSource(uid)
+// ServerState 服务状态
+func ServerState(srvName string) byte {
+	adr := env.registry.ServerAddress(srvName)
+	if adr == "" {
+		return StaCLOSE
+	}
+	return StaBUSY
 }

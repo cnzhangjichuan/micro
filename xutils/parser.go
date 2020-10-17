@@ -1,50 +1,35 @@
 package xutils
 
 import (
-	"github.com/json-iterator/go"
-	"github.com/xlsx"
-	"io"
-	"io/ioutil"
-	"os"
-	"reflect"
+	"hash/crc32"
 	"strconv"
 	"strings"
-	"time"
+	"unsafe"
 )
 
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
-
-func MarshalJson(v interface{}) ([]byte, error) {
-	switch d := v.(type) {
-	default:
-		return json.Marshal(v)
-	case []byte:
-		return d, nil
-	}
+// UnsafeStringToBytes 将string转成[]byte
+func UnsafeStringToBytes(s string) []byte {
+	x := (*[2]uintptr)(unsafe.Pointer(&s))
+	h := [3]uintptr{x[0], x[1], x[1]}
+	return *(*[]byte)(unsafe.Pointer(&h))
 }
 
-func UnmarshalJson(data []byte, v interface{}) error {
-	return json.Unmarshal(data, v)
+// UnsafeBytesToString 将[]byte转成string
+func UnsafeBytesToString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
 }
 
-func LoadFromFile(conf interface{}, fileName string) error {
-	data, err := ioutil.ReadFile(fileName)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(data, conf)
+// HashCode32 计算string的hash码
+func HashCode32(s string) uint32 {
+	return crc32.ChecksumIEEE(UnsafeStringToBytes(s))
 }
 
-func SplitStrings(s, sep string) []string {
-	if s == "" {
-		return nil
-	}
-	if sep == "" {
-		sep = ","
-	}
-	return strings.Split(s, sep)
+// HashCodeBS 计算[]byte的hash码
+func HashCodeBS(bs []byte) uint32 {
+	return crc32.ChecksumIEEE(bs)
 }
 
+// ParseByte 将string转成byte
 func ParseByte(s string, def byte) byte {
 	i, err := strconv.ParseInt(s, 10, 8)
 	if err != nil {
@@ -53,6 +38,13 @@ func ParseByte(s string, def byte) byte {
 	return byte(i)
 }
 
+// ParseIntToBytes i的字符串表示
+func ParseIntToBytes(i int64) []byte {
+	s := strconv.FormatInt(i, 10)
+	return UnsafeStringToBytes(s)
+}
+
+// ParseBytes 使用;将字符串分隔成[]byte
 func ParseBytes(s string) (ret []byte) {
 	if s == "" {
 		return
@@ -66,6 +58,7 @@ func ParseBytes(s string) (ret []byte) {
 	return
 }
 
+// ParseI32 将string转成int32
 func ParseI32(s string, def int32) int32 {
 	i, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
@@ -74,6 +67,7 @@ func ParseI32(s string, def int32) int32 {
 	return int32(i)
 }
 
+// ParseI32S 使用;将字符串分隔成[]int32
 func ParseI32S(s string) (ret []int32) {
 	if s == "" {
 		return
@@ -87,6 +81,7 @@ func ParseI32S(s string) (ret []int32) {
 	return
 }
 
+// ParseI64 将string转成int64
 func ParseI64(s string, def int64) int64 {
 	i, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
@@ -95,6 +90,7 @@ func ParseI64(s string, def int64) int64 {
 	return int64(i)
 }
 
+// ParseI64S 使用;将字符串分隔成[]int64
 func ParseI64S(s string) (ret []int64) {
 	if s == "" {
 		return
@@ -108,6 +104,7 @@ func ParseI64S(s string) (ret []int64) {
 	return
 }
 
+// ParseU32 将string转成uint32
 func ParseU32(s string, def uint32) uint32 {
 	i, err := strconv.ParseInt(s, 10, 32)
 	if err != nil {
@@ -116,6 +113,7 @@ func ParseU32(s string, def uint32) uint32 {
 	return uint32(i)
 }
 
+// ParseU32S 使用;将字符串分隔成[]uint32
 func ParseU32S(s string) (ret []uint32) {
 	if s == "" {
 		return
@@ -129,6 +127,7 @@ func ParseU32S(s string) (ret []uint32) {
 	return
 }
 
+// ParseU64 将string转成uint64
 func ParseU64(s string, def uint64) uint64 {
 	i, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
@@ -137,6 +136,7 @@ func ParseU64(s string, def uint64) uint64 {
 	return uint64(i)
 }
 
+// ParseU64S 使用;将字符串分隔成[]uint64
 func ParseU64S(s string) (ret []uint64) {
 	if s == "" {
 		return
@@ -150,6 +150,7 @@ func ParseU64S(s string) (ret []uint64) {
 	return
 }
 
+// ParseF32 将string转成float32
 func ParseF32(s string, def float32) float32 {
 	f, err := strconv.ParseFloat(s, 32)
 	if err != nil {
@@ -158,6 +159,7 @@ func ParseF32(s string, def float32) float32 {
 	return float32(f)
 }
 
+// ParseF32S 使用;将字符串分隔成[]float32
 func ParseF32S(s string) (ret []float32) {
 	if s == "" {
 		return
@@ -171,6 +173,7 @@ func ParseF32S(s string) (ret []float32) {
 	return
 }
 
+// ParseF64 将string转成float64
 func ParseF64(s string, def float64) float64 {
 	f, err := strconv.ParseFloat(s, 64)
 	if err != nil {
@@ -179,6 +182,7 @@ func ParseF64(s string, def float64) float64 {
 	return float64(f)
 }
 
+// ParseF64S 使用;将字符串分隔成[]float64
 func ParseF64S(s string) (ret []float64) {
 	if s == "" {
 		return
@@ -192,10 +196,13 @@ func ParseF64S(s string) (ret []float64) {
 	return
 }
 
+// ParseBool 将string转成bool
+// [1, ture, T]为真
 func ParseBool(s string) bool {
-	return s == "1"
+	return s == "1" || s == "true" || s == "T"
 }
 
+// ParseBools 使用;将字符串分隔成[]bool
 func ParseBools(s string) (ret []bool) {
 	if s == "" {
 		return
@@ -204,11 +211,12 @@ func ParseBools(s string) (ret []bool) {
 	sl := len(ss)
 	ret = make([]bool, sl)
 	for i := 0; i < sl; i++ {
-		ret[i] = ss[i] == "1"
+		ret[i] = ParseBool(ss[i])
 	}
 	return
 }
 
+// HasString 是否含有指定元素
 func HasString(arr []string, item string) bool {
 	al := len(arr)
 	for i := 0; i < al; i++ {
@@ -219,6 +227,7 @@ func HasString(arr []string, item string) bool {
 	return false
 }
 
+// HasU32 是否含有指定元素
 func HasU32(arr []uint32, item uint32) bool {
 	al := len(arr)
 	for i := 0; i < al; i++ {
@@ -229,6 +238,7 @@ func HasU32(arr []uint32, item uint32) bool {
 	return false
 }
 
+// HasU64 是否含有指定元素
 func HasU64(arr []uint64, item uint64) bool {
 	al := len(arr)
 	for i := 0; i < al; i++ {
@@ -239,225 +249,112 @@ func HasU64(arr []uint64, item uint64) bool {
 	return false
 }
 
-func ShitLeftStrings(arr []string) []string {
+// HasI32 是否含有指定元素
+func HasI32(arr []int32, item int32) bool {
 	al := len(arr)
-	for i := 1; i < al; i++ {
-		arr[i-1] = arr[i]
+	for i := 0; i < al; i++ {
+		if arr[i] == item {
+			return true
+		}
 	}
-	return arr[:al-1]
+	return false
 }
 
-func ShitLeftU32S(arr []uint32) []uint32 {
+// HasI64 是否含有指定元素
+func HasI64(arr []int64, item int64) bool {
 	al := len(arr)
-	for i := 1; i < al; i++ {
-		arr[i-1] = arr[i]
-	}
-	return arr[:al-1]
-}
-
-type ExcelHelper struct {
-	Path   string
-	Writer io.Writer
-}
-
-// create excel template
-func (e *ExcelHelper) CreateTemplate(mode interface{}) error {
-	return e.createDataFile(reflect.TypeOf(mode), nil)
-}
-
-// write data
-func (e *ExcelHelper) Write(data interface{}) error {
-	t := reflect.TypeOf(data)
-	if t.Kind() != reflect.Slice {
-		return NewError("must slice param.")
-	}
-
-	return e.createDataFile(reflect.TypeOf(data).Elem(), func(fNames []string, sheet *xlsx.Sheet) {
-		s := xlsx.NewStyle()
-		// font
-		s.Font.Name = xlsx.Helvetica
-		s.Font.Size = 10
-		s.Font.Bold = false
-
-		v := reflect.ValueOf(data)
-		for i := 0; i < v.Len(); i++ {
-			row := sheet.AddRow()
-			e.writeRow(v.Index(i), fNames, row, s)
+	for i := 0; i < al; i++ {
+		if arr[i] == item {
+			return true
 		}
-	})
+	}
+	return false
 }
 
-// read data
-func (e *ExcelHelper) Read(out interface{}) error {
-	xf, err := xlsx.OpenFile(e.Path)
-	if err != nil {
-		return err
-	}
-	sheet := xf.Sheets[0]
-
-	t := reflect.TypeOf(out)
-	if t.Kind() != reflect.Ptr {
-		return NewError("ptr be need.")
-	}
-	t = t.Elem()
-	v := reflect.ValueOf(out)
-	ve := v.Elem()
-
-	switch t.Kind() {
-	default:
-		return NewError("only slice supported!")
-	case reflect.Slice:
-		et := t.Elem()
-		switch et.Kind() {
-		default:
-			head := e.saxHeadFields(et, sheet.Rows[0].Cells)
-			for r := 1; r < len(sheet.Rows); r++ {
-				n := reflect.New(et)
-				e.readRow(n.Elem(), head, sheet.Rows[r].Cells)
-				ve = reflect.Append(ve, n.Elem())
-			}
-		case reflect.Ptr:
-			ett := et.Elem()
-			head := e.saxHeadFields(ett, sheet.Rows[0].Cells)
-			for r := 1; r < len(sheet.Rows); r++ {
-				n := reflect.New(ett)
-				e.readRow(n.Elem(), head, sheet.Rows[r].Cells)
-				ve = reflect.Append(ve, n)
-			}
+// HasInt 是否含有指定元素
+func HasInt(arr []int, item int) bool {
+	al := len(arr)
+	for i := 0; i < al; i++ {
+		if arr[i] == item {
+			return true
 		}
-		v.Elem().Set(ve)
 	}
-	return nil
+	return false
 }
 
-// wirte data to file
-func (e *ExcelHelper) createDataFile(modeType reflect.Type, crDataFunc func([]string, *xlsx.Sheet)) error {
-	fd := xlsx.NewFile()
-
-	if modeType.Kind() == reflect.Ptr {
-		modeType = modeType.Elem()
+// HasF32 是否含有指定元素
+func HasF32(arr []float32, item float32) bool {
+	al := len(arr)
+	for i := 0; i < al; i++ {
+		if arr[i] == item {
+			return true
+		}
 	}
+	return false
+}
 
-	sheet, err := fd.AddSheet("data(" + modeType.Name() + ")")
-	if err != nil {
-		return err
+// HasF64 是否含有指定元素
+func HasF64(arr []float64, item float64) bool {
+	al := len(arr)
+	for i := 0; i < al; i++ {
+		if arr[i] == item {
+			return true
+		}
 	}
-	head := sheet.AddRow()
+	return false
+}
 
-	s := xlsx.NewStyle()
-	// font
-	s.Font.Name = xlsx.Helvetica
-	s.Font.Size = 10
-	s.Font.Bold = true
-
-	var fNames []string
-	for i := 0; i < modeType.NumField(); i++ {
-		f := modeType.Field(i)
-		tex := f.Tag.Get("xlsx")
-		if tex == "" {
+// RemoveSS 从[]string中删除指定的元素
+func RemoveSS(ss []string, s string) []string {
+	found := false
+	sdx := int(0)
+	for i := 0; i < len(ss); i++ {
+		if ss[i] == s {
+			found = true
+			sdx = i
 			continue
 		}
-		c := head.AddCell()
-		c.SetStyle(s)
-		c.SetString(tex)
-		fNames = append(fNames, f.Name)
-	}
-
-	if crDataFunc != nil {
-		crDataFunc(fNames, sheet)
-	}
-
-	// writer
-	if e.Writer != nil {
-		return fd.Write(e.Writer)
-	}
-
-	// file
-	out, err := os.Create(e.Path)
-	if err != nil {
-		return err
-	}
-	err = fd.Write(out)
-	out.Close()
-
-	return err
-}
-
-func (e *ExcelHelper) saxHeadFields(et reflect.Type, headCells []*xlsx.Cell) []string {
-	head := make([]string, len(headCells))
-	for c := 0; c < len(headCells); c++ {
-		n := headCells[c].String()
-		for i := 0; i < et.NumField(); i++ {
-			f := et.Field(i)
-			if f.Tag.Get("xlsx") == n {
-				head[c] = f.Name
-				break
-			}
-		}
-	}
-	return head
-}
-
-func (e *ExcelHelper) writeRow(v reflect.Value, fNames []string, row *xlsx.Row, s *xlsx.Style) {
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
-	for x := 0; x < len(fNames); x++ {
-		f := v.FieldByName(fNames[x])
-		if !f.IsValid() {
+		if !found {
 			continue
 		}
-		c := row.AddCell()
-		c.SetStyle(s)
-		o := f.Interface()
-		if tm, ok := o.(time.Time); ok {
-			c.SetString(tm.Format("2006/01/02 15:04"))
-		} else {
-			c.SetValue(o)
-		}
+		ss[sdx] = ss[i]
+		sdx++
 	}
+	if found {
+		ss = ss[:len(ss)-1]
+	}
+	return ss
 }
 
-func (e *ExcelHelper) readRow(v reflect.Value, head []string, cells []*xlsx.Cell) {
-	for x := 0; x < len(head); x++ {
-		if head[x] == "" {
-			continue
-		}
-		f := v.FieldByName(head[x])
-		if !f.IsValid() || !f.CanSet() {
-			continue
-		}
-		switch f.Kind() {
-		default:
-			if f.Type().Name() == "Time" {
-				tm, err := cells[x].GetTime(false)
-				if err != nil {
-					tm = time.Now()
-				}
-				f.Set(reflect.ValueOf(tm))
-			}
-		case reflect.String:
-			f.SetString(cells[x].Value)
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			if i64, err := cells[x].Int64(); err == nil {
-				f.SetInt(i64)
-			} else {
-				f.SetInt(0)
-			}
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			if u64, err := strconv.ParseUint(cells[x].Value, 10, 64); err == nil {
-				f.SetUint(u64)
-			} else {
-				f.SetUint(0)
-			}
-		case reflect.Float32, reflect.Float64:
-			if f64, err := cells[x].Float(); err == nil {
-				f.SetFloat(f64)
-			} else {
-				f.SetFloat(0)
-			}
-		case reflect.Bool:
-			f.SetBool(cells[x].Bool())
-		}
+// AddNoRepeatItem 添加不重复的元素
+func AddNoRepeatItem(ss []string, s string) []string {
+	if HasString(ss, s) {
+		return ss
 	}
+	return append(ss, s)
+}
+
+// AddFirstItem 将元素加到队列首位
+func AddFirstItem(ss []string, s string) []string {
+	ss = append(ss, "")
+	for i := len(ss)-1; i > 0; i-- {
+		ss[i] = ss[i-1]
+	}
+	ss[0] = s
+	return ss
+}
+
+// ParseFileName 提取文件名称
+func ParseFileName(name string) string {
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		if 'A' <= c && c <= 'Z' {
+			continue
+		}
+		if 'a' <= c && c <= 'z' {
+			continue
+		}
+		return name[:i]
+	}
+	return name
 }

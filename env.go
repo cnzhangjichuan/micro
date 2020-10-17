@@ -1,113 +1,108 @@
 package micro
 
 import (
-	"github.com/cnzhangjichuan/micro/internal/its"
-	"github.com/cnzhangjichuan/micro/internal/xhttp"
-	"github.com/cnzhangjichuan/micro/internal/xrpc"
-	"github.com/cnzhangjichuan/micro/internal/xwsk"
-	"github.com/cnzhangjichuan/micro/types"
+	"log"
 	"net"
-	"net/http"
+	"os"
+	"strings"
+
+	"github.com/micro/cast/cache"
+	"github.com/micro/packet"
 )
 
-// setter logger
-func SetLogger(log types.Logger) {
-	env.log = log
-}
-
-// log for error
-func Error(fmt string, v ...interface{}) {
-	if env.log != nil {
-		env.log.Error(fmt, v...)
-	}
-}
-
-// log for log
-func Log(fmt string, v ...interface{}) {
-	if env.log != nil {
-		env.log.Log(fmt, v...)
-	}
-}
-
 var env struct {
-	id       string
-	port     string
-	address  string
-	handlers its.Handlers
-	log      types.Logger
+	// 配置信息
+	config struct {
+		Name        string
+		Address     string
+		Registry    string
+		AssetsCache bool
+		Expired     int
+		Mask        string
+		DBResource  string
+		DBTables    []string
+		DBSQLs      []string
+	}
+
+	// 校验码
+	authorize authorize
+
+	// 登入/登出
+	onLogin  lgOutterCaller
+	onLogout lgOutterCaller
+
+	// sender
+	sender sender
+
+	// 会话
+	cache cache.Cache
+
+	// 连接监听
+	lsr net.Listener
+
+	// 处理函数
+	chains []chain
+
+	// 注册表
+	registry registry
+
+	// RPC
+	rpc rpc
+
+	// 业务接口
+	bis map[string]bisDpo
+
+	// 重载函数
+	reloadFunc []func()
+
+	// 文件上传
+	uploadFunc map[string]uploadFunc
+
+	// 日志
+	log *log.Logger
 }
 
 func init() {
-	env.handlers = make(its.Handlers)
+	// 处理日志
+	SetLogger(os.Stderr)
+
+	// 业务接口
+	env.bis = make(map[string]bisDpo, 128)
+	env.reloadFunc = make([]func(), 0, 16)
+	env.uploadFunc = make(map[string]uploadFunc, 16)
 }
 
-func initEnv(config *types.EnvConfig) error {
-	env.id = config.Id
-	env.port = config.Port
-	if env.log == nil {
-		SetLogger(its.NewDefaultLogger())
+// loadConfig 加载配配置信息
+func loadConfig() error {
+	pack := packet.New(1024)
+	err := pack.LoadConfig("./config.json", &env.config)
+	packet.Free(pack)
+
+	// 处理监听地址
+	if env.config.Address == "" {
+		env.config.Address = ":9000"
+	} else if strings.Index(env.config.Address, ":") < 0 {
+		env.config.Address = ":" + env.config.Address
 	}
 
-	// set address
-	ifs, err := net.Interfaces()
-	if err != nil {
-		return err
-	}
-	for _, ifa := range ifs {
-		if ifa.Flags&net.FlagUp == 0 {
-			continue
-		}
-		if ifa.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		ads, err := ifa.Addrs()
-		if err != nil {
-			return err
-		}
+	// 初始化校验码
+	env.authorize.Init(env.config.Mask)
 
-		var ip net.IP
-		for _, adr := range ads {
-			switch v := adr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-		}
-		if ip == nil || ip.IsLoopback() {
-			continue
-		}
-		ip = ip.To4()
-		if ip == nil {
-			continue
-		}
-		env.address = ip.String() + ":" + env.port
-		break
-	}
-	return nil
+	return err
 }
 
-type dispatcherHandler struct{}
+// localeAddress 获取本机配置的地址
+func localeAddress() string {
+	loadConfig()
 
-func (rh *dispatcherHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	const (
-		WSK = `websocket`
-		RPC = `rpc`
-		STA = `sta`
-	)
-
-	switch r.Header.Get("Upgrade") {
-	default:
-		xhttp.Handle(w, r)
-
-	case WSK:
-		xwsk.Handle(w, r)
-
-	case RPC:
-		xrpc.Handle(w, r)
-
-	case STA:
-		xrpc.HandleState(w, r)
-
+	var address string
+	idx := strings.Index(env.config.Address, ":")
+	if idx > 0 {
+		address = env.config.Address
+	} else if idx == 0 {
+		address = "127.0.0.1" + env.config.Address
+	} else {
+		address = "127.0.0.1:" + env.config.Address
 	}
+	return address
 }
