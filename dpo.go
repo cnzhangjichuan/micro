@@ -13,10 +13,10 @@ type Dpo interface {
 	Parse(interface{})
 
 	// LoadUser 加载角色数据
-	LoadUser(packet.PackIdentifier) bool
+	LoadUser(packet.Identifier) bool
 
 	// SetUser 设置角色数据
-	SetUser(packet.PackIdentifier)
+	SetUser(packet.Identifier)
 
 	// GetUID 获取UID
 	GetUID() string
@@ -88,7 +88,7 @@ type baseDpo struct {
 }
 
 // LoadUser 加载用户数据
-func (b *baseDpo) LoadUser(u packet.PackIdentifier) bool {
+func (b *baseDpo) LoadUser(u packet.Identifier) bool {
 	uid := u.GetUID()
 	if uid == "" {
 		uid = b.uid
@@ -100,7 +100,7 @@ func (b *baseDpo) LoadUser(u packet.PackIdentifier) bool {
 }
 
 // SetUser 设置用户数据
-func (b *baseDpo) SetUser(u packet.PackIdentifier) {
+func (b *baseDpo) SetUser(u packet.Identifier) {
 	b.uid = u.GetUID()
 	env.cache.Put(b.uid, u)
 }

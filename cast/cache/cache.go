@@ -25,8 +25,8 @@ func New(name string, expired time.Duration) Cache {
 // Cache 数据缓存
 type Cache interface {
 	Has(string) bool
-	Load(packet.Packable, string) bool
-	Put(string, packet.Packable)
+	Load(packet.Serializable, string) bool
+	Put(string, packet.Serializable)
 	Del(string)
 }
 
@@ -44,7 +44,7 @@ func (c *cache) Has(key string) bool {
 }
 
 // Load 从缓存中加载数据
-func (c *cache) Load(data packet.Packable, key string) bool {
+func (c *cache) Load(data packet.Serializable, key string) bool {
 	if key == "" {
 		return false
 	}
@@ -52,7 +52,7 @@ func (c *cache) Load(data packet.Packable, key string) bool {
 }
 
 // Store 将数据放入缓存中
-func (c *cache) Put(key string, data packet.Packable) {
+func (c *cache) Put(key string, data packet.Serializable) {
 	if key == "" || data == nil {
 		return
 	}

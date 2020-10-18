@@ -392,7 +392,7 @@ func (p *Packet) CopyReaderToConnWithProgress(conn net.Conn, src io.Reader, maxN
 			}
 		}
 		if er != nil {
-			if err != io.EOF {
+			if er != io.EOF {
 				err = er
 			}
 			return

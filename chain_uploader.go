@@ -116,6 +116,7 @@ func requestUploadService(api, fileName string) error {
 	fileSize := fs.Size()
 	pack.Write(xutils.ParseIntToBytes(fileSize))
 	pack.Write(httpRowAt)
+	pack.Write(httpRowAt)
 	if _, err = pack.FlushToConn(conn); err != nil {
 		packet.Free(pack)
 		fd.Close()
@@ -144,7 +145,7 @@ func requestUploadService(api, fileName string) error {
 	total := float64(fileSize)
 	Logf("upload file[%s]...", api)
 	_, err = pack.CopyReaderToConnWithProgress(conn, fd, fileSize, func(uploaded int64) {
-		LogOrigin("uploaded...%0.2f%%", float64(uploaded)/total)
+		LogOrigin("uploaded...%0.2f%%", 100*float64(uploaded)/total)
 	})
 	fd.Close()
 	LogNextLine()

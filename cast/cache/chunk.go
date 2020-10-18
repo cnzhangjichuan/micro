@@ -41,7 +41,7 @@ func (c *chunk) Has(k string) (ok bool) {
 }
 
 // Load 从chunk中加载数据
-func (c *chunk) Load(v packet.Packable, k string) (ok bool) {
+func (c *chunk) Load(v packet.Serializable, k string) (ok bool) {
 	c.clearExpired()
 
 	c.RLock()
@@ -92,14 +92,14 @@ func (c *chunk) loadFromDisk(v packet.Decoder, k string) bool {
 	return store.Load(v, c.name, k)
 }
 
-func (c *chunk) Put(k string, v packet.Packable) {
+func (c *chunk) Put(k string, v packet.Serializable) {
 	c.Lock()
 	c.put(k, v, true)
 	c.Unlock()
 }
 
 // Put 设置数据到chunk中
-func (c *chunk) put(k string, v packet.Packable, saved bool) {
+func (c *chunk) put(k string, v packet.Serializable, saved bool) {
 	var (
 		pack   *packet.Packet
 		ok     bool

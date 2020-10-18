@@ -54,3 +54,16 @@ func LogNextLine() {
 	}
 	w.Write([]byte{'\n'})
 }
+
+// Errorf 错误
+func Errorf(fmt string, args ...interface{}) {
+	if !strings.HasSuffix(fmt, "\n") {
+		fmt += "\n"
+	}
+	env.log.Printf(fmt, args...)
+}
+
+// Error 错误
+func Error(args ...interface{}) {
+	env.log.Println(args...)
+}

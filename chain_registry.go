@@ -146,7 +146,6 @@ func (r *registry) Register(remote string) {
 	for r.running {
 		r.client, err = net.DialTimeout("tcp", remote, TIMEOUT)
 		if err != nil {
-			Debug("register remote %s error %v", remote, err)
 			time.Sleep(ERRDELAY)
 			continue
 		}

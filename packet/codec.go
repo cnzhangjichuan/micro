@@ -10,15 +10,15 @@ type Encoder interface {
 	Encode(*Packet)
 }
 
-// Packable 编/解码器
-type Packable interface {
+// Serializable 可序列化包
+type Serializable interface {
 	Decoder
 	Encoder
 }
 
-// PackIdentifier 带用ID标识的编/解码器
-type PackIdentifier interface {
-	Packable
+// Identifier 带用ID标识的可序列化包
+type Identifier interface {
+	Serializable
 
 	// GetUID 获取标识符
 	GetUID() string
