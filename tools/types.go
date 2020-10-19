@@ -6,14 +6,14 @@ import (
 	"github.com/micro/xutils"
 )
 
-// IdNum Id/Num值对
-type IdNum struct {
+// IDNum Id/Num值对
+type IDNum struct {
 	Id  []string
 	Num []int32
 }
 
 // Parse 解析数据
-func (i *IdNum) Parse(s string) {
+func (i *IDNum) Parse(s string) {
 	if s == "" {
 		i.Id = make([]string, 0)
 		i.Num = make([]int32, 0)
@@ -35,26 +35,26 @@ func (i *IdNum) Parse(s string) {
 }
 
 // Len 获取数据长度
-func (i *IdNum) Len() int {
+func (i *IDNum) Len() int {
 	return len(i.Id)
 }
 
 // Get 获取指定位置的数据
-func (i *IdNum) Get(x int) (string, int32) {
+func (i *IDNum) Get(x int) (string, int32) {
 	if x < 0 || x >= len(i.Id) {
 		return "", 0
 	}
 	return i.Id[x], i.Num[x]
 }
 
-// IdFloat Id/Float值对
-type IdFloat struct {
+// IDFloat ID/Float值对
+type IDFloat struct {
 	Id  []string
 	Num []float32
 }
 
 // Parse 解析数据
-func (i *IdFloat) Parse(s string) {
+func (i *IDFloat) Parse(s string) {
 	if s == "" {
 		i.Id = make([]string, 0)
 		i.Num = make([]float32, 0)
@@ -76,14 +76,58 @@ func (i *IdFloat) Parse(s string) {
 }
 
 // Len 获取数据长度
-func (i *IdFloat) Len() int {
+func (i *IDFloat) Len() int {
 	return len(i.Id)
 }
 
 // Get 获取指定位置的数据
-func (i *IdFloat) Get(x int) (string, float32) {
+func (i *IDFloat) Get(x int) (string, float32) {
 	if x < 0 || x >= len(i.Id) {
 		return "", 0
 	}
 	return i.Id[x], i.Num[x]
+}
+
+// TimesRate 次数/比例值对
+type TimesRate struct {
+	Times []int32
+	Rates []float32
+}
+
+// Parse 角析数据
+func (t *TimesRate) Parse(s string) {
+	if s == "" {
+		t.Times = make([]int32, 0)
+		t.Rates = make([]float32, 0)
+		return
+	}
+	items := strings.Split(s, ";")
+	t.Times = make([]int32, len(items))
+	t.Rates = make([]float32, len(items))
+	for x, v := range items {
+		in := strings.Split(v, ",")
+		t.Times[x] = xutils.ParseI32(in[0], 1)
+		if len(in) > 1 {
+			t.Rates[x] = xutils.ParseF32(in[1], 0)
+		} else {
+			t.Rates[x] = 1
+		}
+	}
+}
+
+// GetRate 获取指定次数的概率
+func (t *TimesRate) GetRate(times int32) float32 {
+	for i, ts := range t.Times {
+		if ts == times {
+			return t.Rates[i]
+		}
+		if ts < times {
+			continue
+		}
+		if i > 0 {
+			return t.Rates[i - 1]
+		}
+		return t.Rates[i]
+	}
+	return 1
 }
