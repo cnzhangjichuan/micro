@@ -81,7 +81,11 @@ func parseToJSON(rows []*xlsx.Row, fileName string) error {
 				fd.WriteString("\"")
 			case "strings":
 				fd.WriteString("[\"")
-				fd.WriteString(strings.ReplaceAll(v, ",", "\",\""))
+				if strings.Index(v, ";") >= 0 {
+					fd.WriteString(strings.ReplaceAll(v, ";", "\",\""))
+				} else {
+					fd.WriteString(strings.ReplaceAll(v, ",", "\",\""))
+				}
 				fd.WriteString("\"]")
 			case "int", "float":
 				if v == "" {
