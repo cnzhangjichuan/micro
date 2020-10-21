@@ -306,22 +306,12 @@ func HasF64(arr []float64, item float64) bool {
 
 // RemoveSS 从[]string中删除指定的元素
 func RemoveSS(ss []string, s string) []string {
-	found := false
-	sdx := int(0)
 	for i := 0; i < len(ss); i++ {
 		if ss[i] == s {
-			found = true
-			sdx = i
-			continue
+			copy(ss[i:], ss[i+1:])
+			ss = ss[:len(ss)-1]
+			break
 		}
-		if !found {
-			continue
-		}
-		ss[sdx] = ss[i]
-		sdx++
-	}
-	if found {
-		ss = ss[:len(ss)-1]
 	}
 	return ss
 }

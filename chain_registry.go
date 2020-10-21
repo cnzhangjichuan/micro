@@ -212,22 +212,12 @@ func (r *registry) addRemote(conn net.Conn) {
 
 // removeRemote 移除remote
 func (r *registry) removeRemote(conn net.Conn) {
-	found := false
-	sdx := int(0)
 	for i := 0; i < len(r.remotes); i++ {
 		if r.remotes[i] == conn {
-			found = true
-			sdx = i
-			continue
+			copy(r.remotes[i:], r.remotes[i+1:])
+			r.remotes = r.remotes[:len(r.remotes)-1]
+			break
 		}
-		if !found {
-			continue
-		}
-		r.remotes[sdx] = r.remotes[i]
-		sdx++
-	}
-	if found {
-		r.remotes = r.remotes[:len(r.remotes)-1]
 	}
 }
 

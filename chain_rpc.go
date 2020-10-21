@@ -156,7 +156,6 @@ func (r *rpc) Call(out, in interface{}, adr, api string) error {
 			t.Stop()
 			switch rsp.ReadU32() {
 			case rpcCodeDataOK:
-				Logf("data size %d", rsp.Size())
 				if out != nil {
 					if d, ok := out.(packet.Decoder); ok {
 						d.Decode(rsp)
