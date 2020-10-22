@@ -31,6 +31,11 @@ func ExcelReadFrom(name string, onSetup func(uint64), onReadRow func(*packet.Pac
 
 // ExcelSaveTo 将Excel数据保存到指定的文件中
 func ExcelSaveTo(r io.Reader, dst string) error {
+	return ExcelSaveToWithTypeIndex(r, dst, 3)
+}
+
+// ExcelSaveToWithTypeIndex 将Excel数据保存到指定的文件中
+func ExcelSaveToWithTypeIndex(r io.Reader, dst string, typeIndex int) error {
 	pack, err := packet.NewWithReader(r)
 	if err != nil {
 		return err
@@ -53,12 +58,13 @@ func ExcelSaveTo(r io.Reader, dst string) error {
 	pack.Reset()
 
 	// 设置列名信息
-	names, types := excelGetRowTypes(rows)
+	names, types := excelGetRowTypes(rows, typeIndex)
 	pack.WriteStrings(names)
 
 	// 设置数据
-	pack.WriteU64(uint64(len(rows) - 4))
-	for r := 4; r < len(rows); r++ {
+	rowStart := typeIndex + 1
+	pack.WriteU64(uint64(len(rows) - rowStart))
+	for r := rowStart; r < len(rows); r++ {
 		excelWriteRowToPacket(pack, rows[r], types)
 	}
 	err = pack.SaveToFile(dst)
@@ -68,8 +74,8 @@ func ExcelSaveTo(r io.Reader, dst string) error {
 }
 
 // excelGetRowTypes 获取列类型
-func excelGetRowTypes(rows []*xlsx.Row) (names, types []string) {
-	nCells, tCells := rows[1].Cells, rows[3].Cells
+func excelGetRowTypes(rows []*xlsx.Row, typeIndex int) (names, types []string) {
+	nCells, tCells := rows[1].Cells, rows[typeIndex].Cells
 	names = make([]string, len(nCells))
 	types = make([]string, len(tCells))
 	for i, c := range nCells {
