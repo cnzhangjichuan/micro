@@ -28,6 +28,7 @@ var (
 )
 
 var (
+	httpOption           = []byte("OPTIONS ")
 	httpUpgrade          = []byte("Upgrade: ")
 	httpRPCUpgrade       = []byte("Upgrade: rpc")
 	httpRegistryUpgrade  = []byte("Upgrade: registry")
@@ -46,7 +47,7 @@ var (
 	httpUID              = []byte("UID: ")
 	httpRanges           = []byte("Range: ")
 	httpRespOk           = []byte("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\n")
-	httpRespOkAccess     = []byte("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Api\r\n")
+	httpRespOkAccess     = []byte("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Api\r\nAccess-Control-Allow-Headers: Api,api\r\n")
 	httpRespOk206        = []byte("HTTP/1.1 206 OK\r\nConnection: keep-alive\r\n")
 	httpRespOk404        = []byte("HTTP/1.1 404 Not Found\r\nConnection: keep-alive\r\n")
 	httpRespAccpetRanges = []byte("Accept-Ranges: bytes\r\n")

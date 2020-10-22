@@ -66,6 +66,19 @@ func (h *http) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 	}
 
 	for {
+		if pack.HasPrefix(httpOption) {
+			pack.Reset()
+			pack.Write(httpRespOkAccess)
+			pack.Write(httpRespContent0)
+			pack.Write(httpRowAt)
+			_, err := pack.FlushToConn(conn)
+			if err != nil {
+				break
+			} else {
+				continue
+			}
+		}
+
 		// 获取资源路径
 		path := string(pack.DataBetween(httpPathStart, httpPathEnd))
 
