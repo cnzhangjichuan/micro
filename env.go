@@ -31,9 +31,6 @@ var env struct {
 	onLogin  lgOutterCaller
 	onLogout lgOutterCaller
 
-	// sender
-	sender sender
-
 	// 会话
 	cache cache.Cache
 

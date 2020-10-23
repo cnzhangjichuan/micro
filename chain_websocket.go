@@ -15,6 +15,7 @@ import (
 
 	"github.com/micro/packet"
 	"github.com/micro/xutils"
+	"sync/atomic"
 )
 
 type lgOutterCaller func(dpo Dpo) error
@@ -62,26 +63,70 @@ func SetLogout(f lgOutterCaller) {
 }
 
 // 会话块的数量
-const chunkSize = 16
+const (
+	chunkSize  = 16
+	workerSize = 16
+)
 
 type websocket struct {
 	baseChain
 
-	sChunks  [chunkSize]wsConnChunk
-	dpoPool  sync.Pool
-	connPool sync.Pool
+	dpoPool sync.Pool
+
+	// 会话
+	session struct {
+		chunks [chunkSize]struct {
+			sync.RWMutex
+			m map[string]*wConn
+		}
+		pool sync.Pool
+	}
+
+	// 数据发送器
+	sender struct {
+		sync.RWMutex
+		seq uint32
+		wgo [workerSize]chan *wkConnData
+		adp sync.Pool
+		cdp sync.Pool
+	}
+}
+
+type wConn struct {
+	conn         net.Conn
+	uid          string
+	isCompressed bool
+	group        tUserDpoGroup
 }
 
 // Init 初始化
 func (w *websocket) Init() {
 	for i := 0; i < chunkSize; i++ {
-		w.sChunks[i].Init()
+		w.session.chunks[i].m = make(map[string]*wConn, 256)
 	}
 	w.dpoPool.New = func() interface{} {
 		return &wsDpo{}
 	}
-	w.connPool.New = func() interface{} {
+	w.session.pool.New = func() interface{} {
 		return &wConn{}
+	}
+	w.sender.adp.New = func() interface{} {
+		return &wkAutoData{}
+	}
+	w.sender.cdp.New = func() interface{} {
+		return &wkConnData{}
+	}
+	for i := 0; i < workerSize; i++ {
+		w.sender.wgo[i] = make(chan *wkConnData, 512)
+		go func(c <-chan *wkConnData) {
+			const WT = time.Second * 10
+
+			for wcd := range c {
+				wcd.ad.pack.SetTimeout(0, WT)
+				wcd.ad.pack.FlushToConn(wcd.conn)
+				w.freeConnData(wcd)
+			}
+		}(w.sender.wgo[i])
 	}
 }
 
@@ -92,8 +137,9 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 	}
 
 	var (
-		wc  = w.createWConn()
-		cac = createDpoCache()
+		wc                 = w.createWConn()
+		cac                = createDpoCache()
+		senderIndex uint32 = workerSize
 	)
 
 	// 获取远端地址
@@ -166,9 +212,9 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 		// 调用业务接口
 		if resp, _ := w.callAPI(conn, dpo, api); resp != nil {
 			w.encodingResponseData(dpo.pack, api, resp, isCompress)
-			ad := env.sender.NewAutoData(dpo.pack.Copy())
-			env.sender.AddConnData(conn, ad)
-			env.sender.FreeAutoData(ad)
+			ad := w.NewRespAutoData(dpo.pack.Copy())
+			senderIndex = w.AddRespConnData(conn, ad, senderIndex)
+			w.freeAutoData(ad)
 		}
 
 		// 将自身注册到会话中(切换账号)
@@ -209,9 +255,11 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 
 // Close 关闭
 func (w *websocket) Close() {
-	for i := 0; i < chunkSize; i++ {
-		w.sChunks[i].Close()
+	w.sender.Lock()
+	for i := 0; i < workerSize; i++ {
+		close(w.sender.wgo[i])
 	}
+	w.sender.Unlock()
 }
 
 // callAPI 调用业务接口
@@ -414,24 +462,9 @@ func (w *websocket) freeDpo(dpo *wsDpo) {
 	w.dpoPool.Put(dpo)
 }
 
-// wsConnChunk conn会话单元
-type wsConnChunk struct {
-	sync.RWMutex
-
-	m      map[string]*wConn
-	worker chan func()
-}
-
-type wConn struct {
-	conn         net.Conn
-	uid          string
-	isCompressed bool
-	group        tUserDpoGroup
-}
-
 // createWConn 创建Conn
 func (w *websocket) createWConn() *wConn {
-	return w.connPool.Get().(*wConn)
+	return w.session.pool.Get().(*wConn)
 }
 
 // freeWConn 释放Conn
@@ -443,32 +476,56 @@ func (w *websocket) freeWConn(c *wConn) {
 	c.uid = ""
 	c.isCompressed = false
 	c.group.clear()
-	w.connPool.Put(c)
+	w.session.pool.Put(c)
 }
 
-// Init 初始化
-func (w *wsConnChunk) Init() {
-	const CHUNKSIZE = 128
-
-	w.m = make(map[string]*wConn, CHUNKSIZE)
-	w.worker = make(chan func(), 512)
-	go func(wk <-chan func()) {
-		for f := range w.worker {
-			w.RLock()
-			f()
-			w.RUnlock()
-		}
-	}(w.worker)
+type wkAutoData struct {
+	ref  int64
+	pack *packet.Packet
 }
 
-// Close 关闭会话
-func (w *wsConnChunk) Close() {
-	w.Lock()
-	if w.worker != nil {
-		close(w.worker)
-		w.worker = nil
+// freeAutoData 释放AutoData
+func (w *websocket) freeAutoData(ad *wkAutoData) {
+	if ad == nil {
+		return
 	}
-	w.Unlock()
+	if atomic.AddInt64(&ad.ref, -1) == 0 {
+		packet.Free(ad.pack)
+		w.sender.adp.Put(ad)
+	}
+}
+
+type wkConnData struct {
+	conn net.Conn
+	ad   *wkAutoData
+}
+
+// freeConnData 释放ConnData
+func (w *websocket) freeConnData(wc *wkConnData) {
+	w.freeAutoData(wc.ad)
+	wc.conn, wc.ad = nil, nil
+	w.sender.cdp.Put(wc)
+}
+
+// NewAutoData 创建释放器
+func (w *websocket) NewRespAutoData(pack *packet.Packet) *wkAutoData {
+	ad := w.sender.adp.Get().(*wkAutoData)
+	ad.pack, ad.ref = pack, 1
+	return ad
+}
+
+// AddConnData 添加数据
+func (w *websocket) AddRespConnData(conn net.Conn, ad *wkAutoData, idx uint32) uint32 {
+	w.sender.RLock()
+	wk := w.sender.cdp.Get().(*wkConnData)
+	wk.conn, wk.ad = conn, ad
+	atomic.AddInt64(&ad.ref, 1)
+	if idx >= workerSize {
+		idx = atomic.AddUint32(&w.sender.seq, 1) % workerSize
+	}
+	w.sender.wgo[idx] <- wk
+	w.sender.RUnlock()
+	return idx
 }
 
 // RegisterConn 注册到会话中
@@ -477,17 +534,12 @@ func (w *websocket) RegisterConn(c *wConn) {
 		return
 	}
 	idx := xutils.HashCode32(c.uid) % chunkSize
-	w.sChunks[idx].Register(c)
-}
-
-// Register 注册
-func (w *wsConnChunk) Register(c *wConn) {
-	w.Lock()
-	if c1, ok := w.m[c.uid]; ok && c1 != c {
+	w.session.chunks[idx].Lock()
+	if c1, ok := w.session.chunks[idx].m[c.uid]; ok && c1 != c {
 		c1.conn.Close()
 	}
-	w.m[c.uid] = c
-	w.Unlock()
+	w.session.chunks[idx].m[c.uid] = c
+	w.session.chunks[idx].Unlock()
 }
 
 // UnRegisterConn 从会话中注销
@@ -496,127 +548,111 @@ func (w *websocket) UnRegisterConn(c *wConn) {
 		return
 	}
 	idx := xutils.HashCode32(c.uid) % chunkSize
-	w.sChunks[idx].UnRegister(c)
-}
-
-// UnRegister 注销
-func (w *wsConnChunk) UnRegister(c *wConn) {
-	w.Lock()
-	if c1, ok := w.m[c.uid]; ok && c1 == c {
-		delete(w.m, c.uid)
+	w.session.chunks[idx].Lock()
+	if c1, ok := w.session.chunks[idx].m[c.uid]; ok && c1 == c {
+		delete(w.session.chunks[idx].m, c.uid)
 	}
-	w.Unlock()
+	w.session.chunks[idx].Unlock()
 }
 
 // SendData 发送数据
 func (w *websocket) SendData(v interface{}, api string, uids []string) {
-	// 创建数据包
-	crGzd := func(isCompressed bool) *wkAutoData {
-		pack := packet.New(2048)
-		w.encodingResponseData(pack, api, v, isCompressed)
-		return env.sender.NewAutoData(pack)
-	}
+	var gzd, nzd *wkAutoData
 
-	// 添加到worker中
-	for i := 0; i < chunkSize; i++ {
-		w.sChunks[i].SendData(crGzd, uids)
-	}
-}
-
-// SendData 发送数据
-func (w *wsConnChunk) SendData(crGzd func(bool) *wkAutoData, uids []string) {
-	w.RLock()
-	if w.worker != nil {
-		w.worker <- func() {
-			var gzd, nzd *wkAutoData
-			if len(uids) > 0 {
-				// 按用户发送
-				for _, uid := range uids {
-					if m, ok := w.m[uid]; ok {
-						if m.isCompressed {
-							if gzd == nil {
-								gzd = crGzd(true)
-							}
-							env.sender.AddConnData(m.conn, gzd)
-						} else {
-							if nzd == nil {
-								nzd = crGzd(false)
-							}
-							env.sender.AddConnData(m.conn, nzd)
-						}
-					}
-				}
-			} else {
-				// 全部发送
-				for _, m := range w.m {
+	if len(uids) > 0 {
+		// 按用户发送
+		for i := 0; i < chunkSize; i++ {
+			w.session.chunks[i].RLock()
+			for _, uid := range uids {
+				if m, ok := w.session.chunks[i].m[uid]; ok {
 					if m.isCompressed {
 						if gzd == nil {
-							gzd = crGzd(true)
+							pack := packet.New(2048)
+							w.encodingResponseData(pack, api, v, true)
+							gzd = w.NewRespAutoData(pack)
 						}
-						env.sender.AddConnData(m.conn, gzd)
+						w.AddRespConnData(m.conn, gzd, workerSize)
 					} else {
 						if nzd == nil {
-							nzd = crGzd(false)
+							pack := packet.New(2048)
+							w.encodingResponseData(pack, api, v, false)
+							nzd = w.NewRespAutoData(pack)
 						}
-						env.sender.AddConnData(m.conn, nzd)
+						w.AddRespConnData(m.conn, nzd, workerSize)
 					}
 				}
 			}
-			if gzd != nil {
-				env.sender.FreeAutoData(gzd)
+			w.session.chunks[i].RUnlock()
+		}
+	} else {
+		// 全部发送
+		for i := 0; i < chunkSize; i++ {
+			w.session.chunks[i].RLock()
+			for _, m := range w.session.chunks[i].m {
+				if m.isCompressed {
+					if gzd == nil {
+						pack := packet.New(2048)
+						w.encodingResponseData(pack, api, v, true)
+						gzd = w.NewRespAutoData(pack)
+					}
+					w.AddRespConnData(m.conn, gzd, workerSize)
+				} else {
+					if nzd == nil {
+						pack := packet.New(2048)
+						w.encodingResponseData(pack, api, v, false)
+						nzd = w.NewRespAutoData(pack)
+					}
+					w.AddRespConnData(m.conn, nzd, workerSize)
+				}
 			}
-			if nzd != nil {
-				env.sender.FreeAutoData(nzd)
-			}
+			w.session.chunks[i].RUnlock()
 		}
 	}
-	w.RUnlock()
+
+	// 释放资源
+	if gzd != nil {
+		w.freeAutoData(gzd)
+	}
+	if nzd != nil {
+		w.freeAutoData(nzd)
+	}
 }
 
 // SendGroup 按组发送数据
 func (w *websocket) SendGroup(v interface{}, api string, flag uint8, group string) {
-	// 创建数据包
-	crGzd := func(isCompressed bool) *wkAutoData {
-		pack := packet.New(2048)
-		w.encodingResponseData(pack, api, v, isCompressed)
-		return env.sender.NewAutoData(pack)
-	}
+	var gzd, nzd *wkAutoData
 
-	// 添加到worker中
+	// 按组发送数据
 	for i := 0; i < chunkSize; i++ {
-		w.sChunks[i].SendGroup(crGzd, flag, group)
-	}
-}
-
-// SendGroup 按组发送数据
-func (w *wsConnChunk) SendGroup(crGzd func(bool) *wkAutoData, flag uint8, group string) {
-	w.RLock()
-	if w.worker != nil {
-		w.worker <- func() {
-			var gzd, nzd *wkAutoData
-			for _, m := range w.m {
-				if !m.group.Match(flag, group) {
-					continue
-				}
-				if m.isCompressed {
-					if gzd == nil {
-						gzd = crGzd(true)
-					}
-					env.sender.AddConnData(m.conn, gzd)
-				} else {
-					if nzd == nil {
-						nzd = crGzd(false)
-					}
-					env.sender.AddConnData(m.conn, nzd)
-				}
+		w.session.chunks[i].RLock()
+		for _, m := range w.session.chunks[i].m {
+			if !m.group.Match(flag, group) {
+				continue
 			}
-			if gzd != nil {
-				env.sender.FreeAutoData(gzd)
-			}
-			if nzd != nil {
-				env.sender.FreeAutoData(nzd)
+			if m.isCompressed {
+				if gzd == nil {
+					pack := packet.New(2048)
+					w.encodingResponseData(pack, api, v, true)
+					gzd = w.NewRespAutoData(pack)
+				}
+				w.AddRespConnData(m.conn, gzd, workerSize)
+			} else {
+				if nzd == nil {
+					pack := packet.New(2048)
+					w.encodingResponseData(pack, api, v, false)
+					nzd = w.NewRespAutoData(pack)
+				}
+				w.AddRespConnData(m.conn, nzd, workerSize)
 			}
 		}
+		w.session.chunks[i].RUnlock()
 	}
-	w.RUnlock()
+
+	// 释放资源
+	if gzd != nil {
+		w.freeAutoData(gzd)
+	}
+	if nzd != nil {
+		w.freeAutoData(nzd)
+	}
 }

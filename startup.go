@@ -51,9 +51,6 @@ func startupService(onStartup func()) error {
 		env.cache = cache.New("", time.Duration(env.config.Expired)*time.Second)
 	}
 
-	// 工作协程
-	env.sender.Init()
-
 	// 调用启动前逻辑
 	if onStartup != nil {
 		onStartup()
@@ -106,7 +103,6 @@ func startupService(onStartup func()) error {
 	for i := 0; i < len(env.chains); i++ {
 		env.chains[i].Close()
 	}
-	env.sender.Close()
 	store.Close()
 
 	return errors.New("service is down")
