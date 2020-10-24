@@ -44,8 +44,9 @@ const assets = `./assets`
 // Handle 处理Conn
 func (h *http) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 	const (
-		WT = time.Second * 10
-		RT = time.Second * 30
+		WT              = time.Second * 10
+		RT              = time.Second * 30
+		thirdPartPrefix = `/third-part/`
 	)
 
 	if name != "" {
@@ -66,49 +67,48 @@ func (h *http) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 	}
 
 	for {
+		// 是否关闭连接
+		isClosed := pack.Index(httpConnectionClose) >= 0
+
 		if pack.HasPrefix(httpOption) {
+			// 处理Option请求
 			pack.Reset()
 			pack.Write(httpRespOkAccess)
 			pack.Write(httpRespContent0)
 			pack.Write(httpRowAt)
-			_, err := pack.FlushToConn(conn)
-			if err != nil {
-				break
-			} else {
-				continue
-			}
-		}
-
-		// 获取资源路径
-		path := string(pack.DataBetween(httpPathStart, httpPathEnd))
-
-		// api
-		api := pack.HTTPHeaderValue(httpAPI)
-
-		// 是否支持zlib
-		v := pack.DataBetween(httpAcceptEncoding, httpRowAt)
-		isZlib := bytes.Index(v, httpAcceptGzlib) >= 0
-
-		// 是否长连
-		v = pack.DataBetween(httpConnection, httpRowAt)
-		isKeepAlive := bytes.Index(v, httpKeepAlive) >= 0
-
-		// 处理资源
-		if api == "" || path != "" {
-			if err := h.sendResource(conn, pack, path, isZlib); err != nil {
+			if _, err := pack.FlushToConn(conn); err != nil {
 				break
 			}
 		} else {
-			if cac == nil {
-				cac = createDpoCache()
-			}
-			if err := h.callAPI(conn, pack, api, remote, isZlib, cac); err != nil {
-				break
+			// 是否支持zlib
+			v := pack.DataBetween(httpAcceptEncoding, httpRowAt)
+			isZlib := bytes.Index(v, httpAcceptGzlib) >= 0
+			// api
+			api := pack.HTTPHeaderValue(httpAPI)
+			if api != "" {
+				// 处理API
+				if cac == nil {
+					cac = createDpoCache()
+				}
+				if err := h.callAPI(conn, pack, api, remote, isZlib, cac, isClosed); err != nil {
+					break
+				}
+			} else {
+				// 获取资源路径
+				path := string(pack.DataBetween(httpPathStart, httpPathEnd))
+				if strings.HasPrefix(path, thirdPartPrefix) {
+					// 处理第三方调用
+				} else {
+					// 处理静态资源
+					if err := h.sendResource(conn, pack, path, isZlib, isClosed); err != nil {
+						break
+					}
+				}
 			}
 		}
 
-		// 如果不是长连，直接断开连结
-		if !isKeepAlive {
+		// 关闭连接
+		if isClosed {
 			break
 		}
 
@@ -122,7 +122,7 @@ func (h *http) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 }
 
 // callAPI 调用api
-func (h *http) callAPI(conn net.Conn, pack *packet.Packet, api, remote string, isZlib bool, cac map[string]interface{}) error {
+func (h *http) callAPI(conn net.Conn, pack *packet.Packet, api, remote string, isZlib bool, cac map[string]interface{}, isClosed bool) error {
 	var (
 		resp    interface{}
 		errCode string
@@ -160,6 +160,9 @@ func (h *http) callAPI(conn net.Conn, pack *packet.Packet, api, remote string, i
 	pack.Write(httpAPI)
 	pack.Write(xutils.UnsafeStringToBytes(api))
 	pack.Write(httpRowAt)
+	if isClosed {
+		pack.Write(httpConnectionClose)
+	}
 
 	// 业务错误
 	if errCode != "" {
@@ -202,7 +205,7 @@ func (h *http) callAPI(conn net.Conn, pack *packet.Packet, api, remote string, i
 }
 
 // sendResource 发送静态资源
-func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZlib bool) error {
+func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZlib bool, isClosed bool) error {
 	if path == "" {
 		path = "index.html"
 	}
@@ -224,6 +227,9 @@ func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZ
 			h.setContentType(pack, path)
 			pack.Write(httpRespAccpetRanges)
 			pack.Write(httpRespContent0)
+			if isClosed {
+				pack.Write(httpConnectionClose)
+			}
 			pack.Write(httpRowAt)
 			_, err := pack.FlushToConn(conn)
 			return err
@@ -238,6 +244,9 @@ func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZ
 			h.setContentType(pack, path)
 			pack.Write(httpRespAccpetRanges)
 			pack.Write(httpRespContent0)
+			if isClosed {
+				pack.Write(httpConnectionClose)
+			}
 			pack.Write(httpRowAt)
 			_, err := pack.FlushToConn(conn)
 			return err
@@ -266,6 +275,9 @@ func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZ
 		pack.Write(httpContentLength)
 		pack.Write(xutils.ParseIntToBytes(fSize))
 		pack.Write(httpRowAt)
+		if isClosed {
+			pack.Write(httpConnectionClose)
+		}
 		pack.Write(httpRowAt)
 		if _, err := pack.FlushToConn(conn); err != nil {
 			fd.Close()
@@ -286,6 +298,9 @@ func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZ
 	pack.Write(httpContentLength)
 	pack.Write(xutils.ParseIntToBytes(int64(len(data))))
 	pack.Write(httpRowAt)
+	if isClosed {
+		pack.Write(httpConnectionClose)
+	}
 	pack.Write(httpRowAt)
 	pack.Write(data)
 
