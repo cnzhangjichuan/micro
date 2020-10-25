@@ -238,6 +238,14 @@ func (c *codec) encodeFields(fd *bufio.Writer, ft []string) {
 		fd.WriteString(strings.Join([]string{
 			`	p.WriteF64S(o.`, ft[0], `)`, "\n",
 		}, ""))
+	case "bool":
+		fd.WriteString(strings.Join([]string{
+			`	p.WriteBool(o.`, ft[0], `)`, "\n",
+		}, ""))
+	case "[]bool":
+		fd.WriteString(strings.Join([]string{
+			`	p.WriteBools(o.`, ft[0], `)`, "\n",
+		}, ""))
 	case "time.Time":
 		fd.WriteString(strings.Join([]string{
 			`	p.WriteTime(o.`, ft[0], `)`, "\n",
@@ -319,6 +327,14 @@ func (c *codec) decodeFields(fd *bufio.Writer, ft []string) {
 	case "[]float64":
 		fd.WriteString(strings.Join([]string{
 			`	o.`, ft[0], ` = p.ReadF64S()`, "\n",
+		}, ""))
+	case "bool":
+		fd.WriteString(strings.Join([]string{
+			`	o.`, ft[0], ` = p.ReadBool()`, "\n",
+		}, ""))
+	case "[]bool":
+		fd.WriteString(strings.Join([]string{
+			`	o.`, ft[0], ` = p.ReadBools()`, "\n",
 		}, ""))
 	case "time.Time":
 		fd.WriteString(strings.Join([]string{

@@ -6,128 +6,147 @@ import (
 	"github.com/micro/xutils"
 )
 
-// IDNum Id/Num值对
-type IDNum struct {
-	Id  []string
-	Num []int32
+// SI32 string/int32值对
+type SI32 struct {
+	str []string
+	i32 []int32
 }
 
 // Parse 解析数据
-func (i *IDNum) Parse(s string) {
+func (mixed *SI32) Parse(s string) {
 	if s == "" {
-		i.Id = make([]string, 0)
-		i.Num = make([]int32, 0)
+		mixed.str = make([]string, 0)
+		mixed.i32 = make([]int32, 0)
 		return
 	}
 
 	items := strings.Split(s, ";")
-	i.Id = make([]string, len(items))
-	i.Num = make([]int32, len(items))
+	mixed.str = make([]string, len(items))
+	mixed.i32 = make([]int32, len(items))
 	for x, v := range items {
 		in := strings.Split(v, ",")
-		i.Id[x] = in[0]
+		mixed.str[x] = in[0]
 		if len(in) > 1 {
-			i.Num[x] = xutils.ParseI32(in[1], 0)
+			mixed.i32[x] = xutils.ParseI32(in[1], 0)
 		} else {
-			i.Num[x] = 0
+			mixed.i32[x] = 0
 		}
 	}
 }
 
 // Len 获取数据长度
-func (i *IDNum) Len() int {
-	return len(i.Id)
+func (mixed *SI32) Len() int {
+	return len(mixed.str)
 }
 
 // Get 获取指定位置的数据
-func (i *IDNum) Get(x int) (string, int32) {
-	if x < 0 || x >= len(i.Id) {
+func (mixed *SI32) Get(x int) (string, int32) {
+	if x < 0 || x >= len(mixed.str) {
 		return "", 0
 	}
-	return i.Id[x], i.Num[x]
+	return mixed.str[x], mixed.i32[x]
 }
 
-// IDFloat ID/Float值对
-type IDFloat struct {
-	Id  []string
-	Num []float32
+// SF32 string/float32值对
+type SF32 struct {
+	str []string
+	f32 []float32
 }
 
 // Parse 解析数据
-func (i *IDFloat) Parse(s string) {
+func (mixed *SF32) Parse(s string) {
 	if s == "" {
-		i.Id = make([]string, 0)
-		i.Num = make([]float32, 0)
+		mixed.str = make([]string, 0)
+		mixed.f32 = make([]float32, 0)
 		return
 	}
 
 	items := strings.Split(s, ";")
-	i.Id = make([]string, len(items))
-	i.Num = make([]float32, len(items))
+	mixed.str = make([]string, len(items))
+	mixed.f32 = make([]float32, len(items))
 	for x, v := range items {
 		in := strings.Split(v, ",")
-		i.Id[x] = in[0]
+		mixed.str[x] = in[0]
 		if len(in) > 1 {
-			i.Num[x] = xutils.ParseF32(in[1], 0)
+			mixed.f32[x] = xutils.ParseF32(in[1], 0)
 		} else {
-			i.Num[x] = 0
+			mixed.f32[x] = 0
 		}
 	}
 }
 
 // Len 获取数据长度
-func (i *IDFloat) Len() int {
-	return len(i.Id)
+func (mixed *SF32) Len() int {
+	return len(mixed.str)
 }
 
 // Get 获取指定位置的数据
-func (i *IDFloat) Get(x int) (string, float32) {
-	if x < 0 || x >= len(i.Id) {
+func (mixed *SF32) Get(x int) (string, float32) {
+	if x < 0 || x >= len(mixed.str) {
 		return "", 0
 	}
-	return i.Id[x], i.Num[x]
+	return mixed.str[x], mixed.f32[x]
 }
 
 // TimesRate 次数/比例值对
-type TimesRate struct {
-	Times []int32
-	Rates []float32
+type I32F32 struct {
+	i32 []int32
+	f32 []float32
 }
 
-// Parse 角析数据
-func (t *TimesRate) Parse(s string) {
+// Parse 解析数据
+func (mixed *I32F32) Parse(s string) {
 	if s == "" {
-		t.Times = make([]int32, 0)
-		t.Rates = make([]float32, 0)
+		mixed.i32 = make([]int32, 0)
+		mixed.f32 = make([]float32, 0)
 		return
 	}
 	items := strings.Split(s, ";")
-	t.Times = make([]int32, len(items))
-	t.Rates = make([]float32, len(items))
+	mixed.i32 = make([]int32, len(items))
+	mixed.f32 = make([]float32, len(items))
 	for x, v := range items {
 		in := strings.Split(v, ",")
-		t.Times[x] = xutils.ParseI32(in[0], 1)
+		mixed.i32[x] = xutils.ParseI32(in[0], 1)
 		if len(in) > 1 {
-			t.Rates[x] = xutils.ParseF32(in[1], 0)
+			mixed.f32[x] = xutils.ParseF32(in[1], 0)
 		} else {
-			t.Rates[x] = 1
+			mixed.f32[x] = 0
 		}
 	}
 }
 
-// GetRate 获取指定次数的概率
-func (t *TimesRate) GetRate(times int32) float32 {
-	for i, ts := range t.Times {
-		if ts == times {
-			return t.Rates[i]
-		}
-		if ts < times {
-			continue
-		}
-		if i > 0 {
-			return t.Rates[i - 1]
-		}
-		return t.Rates[i]
+// Len 获取数据长度
+func (mixed *I32F32) Len() int {
+	return len(mixed.i32)
+}
+
+// Get 获取指定位置的数据
+func (mixed *I32F32) Get(x int) (int32, float32) {
+	if x < 0 || x >= len(mixed.i32) {
+		return 0, 0
 	}
-	return 1
+	return mixed.i32[x], mixed.f32[x]
+}
+
+// GetRate 获取指定次数的概率
+// times 从1次开始
+func (t *I32F32) GetTimesRate(times int32) float32 {
+	// 没有找到匹配项
+	// 取最接近的数据返回
+	var (
+		retTimes = int32(0)
+		retRate  float32
+	)
+	for i, ts := range t.i32 {
+		if times == ts {
+			return t.f32[i]
+		}
+		if times > ts {
+			rt, rr := ts, t.f32[i]
+			if rt > retTimes {
+				retTimes, retRate = rt, rr
+			}
+		}
+	}
+	return retRate
 }
