@@ -38,8 +38,7 @@ var (
 	httpPathStart        = []byte{' ', '/'}
 	httpPathEnd          = []byte{' '}
 	httpContentLength    = []byte("Content-Length: ")
-	httpConnection       = []byte("Connection: ")
-	httpKeepAlive        = []byte("keep-alive")
+	httpConnectionClose  = []byte("Connection: close\r\n")
 	httpAPI              = []byte("Api: ")
 	httpRowAt            = []byte{'\r', '\n'}
 	httpAcceptEncoding   = []byte("Accept-Encoding: ")

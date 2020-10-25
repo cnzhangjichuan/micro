@@ -427,6 +427,11 @@ func (p *Packet) DataBetween(from, dest []byte) []byte {
 	return bs[:end]
 }
 
+// Index 查找指定的文本位置
+func (p *Packet) Index(v []byte) int {
+	return bytes.Index(p.buf[p.r:p.w], v)
+}
+
 // HasPrefix 是否以指定文本开头
 func (p *Packet) HasPrefix(prefix []byte) bool {
 	if cap(p.buf) == 0 {
