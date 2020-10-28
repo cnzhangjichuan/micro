@@ -29,7 +29,7 @@ func (c *codec) AutoCode(dirName string) error {
 	}
 
 	for fdr, ss := range c.payload {
-		fd, err := os.Create(filepath.Join(dirName, fdr, "codec.go"))
+		fd, err := os.Create(filepath.Join(fdr, "codec.go"))
 		if err != nil {
 			return err
 		}
