@@ -46,7 +46,7 @@ var (
 	httpUID              = []byte("UID: ")
 	httpRanges           = []byte("Range: ")
 	httpRespOk           = []byte("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\n")
-	httpRespOkAccess     = []byte("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Api\r\nAccess-Control-Allow-Headers: Api,api\r\n")
+	httpRespOkAccess     = []byte("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Expose-Headers: Api,UID\r\nAccess-Control-Allow-Headers: Api,UID\r\n")
 	httpRespOk206        = []byte("HTTP/1.1 206 OK\r\nConnection: keep-alive\r\n")
 	httpRespOk404        = []byte("HTTP/1.1 404 Not Found\r\nConnection: keep-alive\r\n")
 	httpRespAccpetRanges = []byte("Accept-Ranges: bytes\r\n")
