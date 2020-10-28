@@ -300,7 +300,11 @@ func (w *websocket) handshake(conn net.Conn, pack *packet.Packet, onLogin func([
 	pack.ReadHTTPBody(conn)
 	pack.Reset()
 	pack.Write(wsRespOK)
-
+	if len(protocols) > 0 {
+		pack.Write(wsProtocol)
+		pack.Write(xutils.UnsafeStringToBytes(protocols[0]))
+		pack.Write(httpRowAt)
+	}
 	// sec-websocket-accept
 	pack.Write(wsAccept)
 	pack.Write(xutils.UnsafeStringToBytes(secWK))
