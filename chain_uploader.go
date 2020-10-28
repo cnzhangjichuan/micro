@@ -91,16 +91,16 @@ func RegisterUploadFunc(name string, f uploadFunc) {
 
 // 上传文件
 func requestUploadService(api, fileName string) error {
+	fd, err := os.Open(fileName)
+	if err != nil {
+		return err
+	}
 	conn, err := net.DialTimeout("tcp", localeAddress(), time.Second)
 	if err != nil {
+		fd.Close()
 		return errors.New("service not found, it may be closed")
 	}
 
-	fd, err := os.Open(fileName)
-	if err != nil {
-		conn.Close()
-		return err
-	}
 	pack := packet.New(1024)
 
 	// 发送请求

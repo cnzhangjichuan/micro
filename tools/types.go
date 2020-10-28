@@ -12,6 +12,12 @@ type SI32 struct {
 	i32 []int32
 }
 
+// Add 添加数据
+func (mixed *SI32) Add(s string, i int32) {
+	mixed.str = append(mixed.str, s)
+	mixed.i32 = append(mixed.i32, i)
+}
+
 // Parse 解析数据
 func (mixed *SI32) Parse(s string) {
 	if s == "" {
@@ -53,6 +59,12 @@ type SF32 struct {
 	f32 []float32
 }
 
+// Add 添加数据
+func (mixed *SF32) Add(s string, f float32) {
+	mixed.str = append(mixed.str, s)
+	mixed.f32 = append(mixed.f32, f)
+}
+
 // Parse 解析数据
 func (mixed *SF32) Parse(s string) {
 	if s == "" {
@@ -92,6 +104,12 @@ func (mixed *SF32) Get(x int) (string, float32) {
 type I32F32 struct {
 	i32 []int32
 	f32 []float32
+}
+
+// Add 添加数据
+func (mixed *I32F32) Add(i int32, f float32) {
+	mixed.i32 = append(mixed.i32, i)
+	mixed.f32 = append(mixed.f32, f)
 }
 
 // Parse 解析数据
