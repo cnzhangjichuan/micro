@@ -108,7 +108,7 @@ func excelWriteRowToPacket(pack *packet.Packet, row *xlsx.Row, types []string) {
 			} else {
 				pack.WriteF64(0)
 			}
-		case "string":
+		case "string", "strings":
 			if len(cells) > i {
 				pack.WriteString(cells[i].String())
 			} else {

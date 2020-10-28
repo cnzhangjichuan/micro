@@ -59,20 +59,26 @@ func parseToJSON(rows []*xlsx.Row, fileName string) error {
 	types := rows[2].Cells
 	fd.WriteString("module.exports={\n")
 	for c, pn := range props {
+		name := pn.String()
+		if name == "" {
+			continue
+		}
 		if c > 0 {
 			fd.WriteString(",\n")
 		}
-		name := pn.String()
 		fd.WriteString(name)
 		fd.WriteString(":[")
 		typ := types[c].String()
 		for r := 3; r < len(rows); r++ {
-			if r > 3 {
-				fd.WriteString(",")
-			}
 			v := ""
 			if len(rows[r].Cells) > c {
 				v = rows[r].Cells[c].String()
+			}
+			if c == 0 && v == "" {
+				break
+			}
+			if r > 3 {
+				fd.WriteString(",")
 			}
 			switch typ {
 			default:
