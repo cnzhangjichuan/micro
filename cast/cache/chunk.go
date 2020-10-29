@@ -15,7 +15,7 @@ import (
 type chunk struct {
 	sync.RWMutex
 	name    string
-	m       map[string]*packet.Packet
+	m       map[string][]byte
 	expired time.Duration
 	times   uint32
 }
@@ -24,18 +24,15 @@ type chunk struct {
 func (c *chunk) Init(name string, expired time.Duration, size uint32) {
 	c.name = name
 	c.expired = expired
-	c.m = make(map[string]*packet.Packet, size)
+	c.m = make(map[string][]byte, size)
 }
 
 // Has 是否存在指定的数据
 func (c *chunk) Has(k string) (ok bool) {
-	var pack *packet.Packet
 	c.clearExpired()
 
 	c.RLock()
-	pack, ok = c.m[k]
-	// 校验是否过期
-	ok = ok && !c.isExpired(pack)
+	_, ok = c.m[k]
 	c.RUnlock()
 	return
 }
@@ -45,42 +42,29 @@ func (c *chunk) Load(v packet.Serializable, k string) (ok bool) {
 	c.clearExpired()
 
 	c.RLock()
-	pack, ok := c.m[k]
+	data, ok := c.m[k]
+
+	// 组装数据
+	if ok {
+		s := 0
+		if c.expired > 0 {
+			s = 4
+		}
+		pack := packet.NewWithData(data[s:])
+		v.Decode(pack)
+		packet.FreeOnlyMine(pack)
+		c.RUnlock()
+		return
+	}
+	c.RUnlock()
 
 	// 没有缓存，从磁盘加载
-	if !ok {
-		c.RUnlock()
-		ok = c.loadFromDisk(v, k)
-		if ok {
-			c.Lock()
-			c.put(k, v, false)
-			c.Unlock()
-		}
-		return
+	ok = c.loadFromDisk(v, k)
+	if ok {
+		c.Lock()
+		c.put(k, v, false)
+		c.Unlock()
 	}
-
-	// 回到起始位置
-	pack.Seek(0, -1)
-
-	// 数据已过期
-	if c.isExpired(pack) {
-		c.RUnlock()
-		ok = c.loadFromDisk(v, k)
-		if ok {
-			c.Lock()
-			c.put(k, v, false)
-			c.Unlock()
-		}
-		return
-	}
-
-	// 过期标识需要占用4个byte
-	if c.expired > 0 {
-		pack.Seek(4, -1)
-	}
-	v.Decode(pack)
-
-	c.RUnlock()
 	return
 }
 
@@ -102,20 +86,21 @@ func (c *chunk) Put(k string, v packet.Serializable) {
 func (c *chunk) put(k string, v packet.Serializable, saved bool) {
 	var (
 		pack   *packet.Packet
+		data   []byte
 		ok     bool
 		oriKey uint32 = 0
 		nowKey uint32 = 0
 	)
 
-	if pack, ok = c.m[k]; ok {
+	if data, ok = c.m[k]; ok {
 		if saved && c.name != "" {
 			if c.expired > 0 {
-				oriKey = xutils.HashCodeBS(pack.Slice(4, -1))
+				oriKey = xutils.HashCodeBS(data[4:])
 			} else {
-				oriKey = xutils.HashCodeBS(pack.Slice(0, -1))
+				oriKey = xutils.HashCodeBS(data)
 			}
 		}
-		pack.Reset()
+		pack = packet.NewWithData(data)
 	} else {
 		pack = packet.New(512)
 	}
@@ -127,7 +112,6 @@ func (c *chunk) put(k string, v packet.Serializable, saved bool) {
 
 	// 编码
 	v.Encode(pack)
-	c.m[k] = pack
 	if saved && c.name != "" {
 		if c.expired > 0 {
 			nowKey = xutils.HashCodeBS(pack.Slice(4, -1))
@@ -135,6 +119,7 @@ func (c *chunk) put(k string, v packet.Serializable, saved bool) {
 			nowKey = xutils.HashCodeBS(pack.Slice(0, -1))
 		}
 	}
+	c.m[k] = packet.FreeOnlyMine(pack)
 
 	// 更新数据到磁盘上
 	if saved && oriKey != nowKey {
@@ -147,26 +132,9 @@ func (c *chunk) Del(k string) {
 	c.Lock()
 	if pack, ok := c.m[k]; ok {
 		delete(c.m, k)
-		packet.Free(pack)
+		packet.FreeBytes(pack)
 	}
 	c.Unlock()
-}
-
-// isExpired 是否过期
-func (c *chunk) isExpired(pack *packet.Packet) bool {
-	// 没有设置过期时长
-	if c.expired <= 0 {
-		return false
-	}
-
-	now := time.Now()
-	if binary.BigEndian.Uint32(pack.Slice(0, 4)) <= uint32(now.Unix()) {
-		return true
-	}
-
-	// 更新过期时间
-	binary.BigEndian.PutUint32(pack.Slice(0, 4), uint32(now.Add(c.expired).Unix()))
-	return false
 }
 
 // clearExpired 清除过期数据
@@ -187,9 +155,9 @@ func (c *chunk) clearExpired() {
 	c.Lock()
 	now := uint32(time.Now().Unix())
 	for k, pack := range c.m {
-		if binary.BigEndian.Uint32(pack.Slice(0, 4)) <= now {
+		if binary.BigEndian.Uint32(pack[:4]) <= now {
 			delete(c.m, k)
-			packet.Free(pack)
+			packet.FreeBytes(pack)
 		}
 	}
 	c.Unlock()

@@ -42,7 +42,7 @@ func NewWithData(data []byte) *Packet {
 	return pack
 }
 
-// Free 释放消息
+// Free 释放数据包
 func Free(pack *Packet) {
 	if pack == nil {
 		return
@@ -55,6 +55,26 @@ func Free(pack *Packet) {
 		pack.buf = nil
 	}
 	packetPool.Put(pack)
+}
+
+// FreeOnlyMine 仅仅释放自身(buff不会释放)
+// 返回里面的数据
+func FreeOnlyMine(pack *Packet) []byte {
+	if pack == nil {
+		return nil
+	}
+	if !atomic.CompareAndSwapUint32(&pack.freed, 0, 1) {
+		return nil
+	}
+	buf := pack.buf
+	pack.buf = nil
+	packetPool.Put(pack)
+	return buf
+}
+
+// FreeBytes 释放数据
+func FreeBytes(bs []byte) {
+	putBytes(bs)
 }
 
 // Packet 数据包

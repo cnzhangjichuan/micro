@@ -130,9 +130,6 @@ func (h *http) callAPI(conn net.Conn, pack *packet.Packet, api, remote string, i
 
 	// 用户标识
 	uid := pack.HTTPHeaderValue(httpUID)
-	if uid != "" && !env.cache.Has(uid) {
-		uid = ""
-	}
 
 	// 读取消息体
 	pack.ReadHTTPBody(conn)
