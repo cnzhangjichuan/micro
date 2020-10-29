@@ -46,11 +46,10 @@ func (c *chunk) Load(v packet.Serializable, k string) (ok bool) {
 
 	// 组装数据
 	if ok {
-		s := 0
+		pack := packet.NewWithData(data)
 		if c.expired > 0 {
-			s = 4
+			pack.Seek(4, -1)
 		}
-		pack := packet.NewWithData(data[s:])
 		v.Decode(pack)
 		packet.FreeOnlyMine(pack)
 		c.RUnlock()
@@ -101,6 +100,7 @@ func (c *chunk) put(k string, v packet.Serializable, saved bool) {
 			}
 		}
 		pack = packet.NewWithData(data)
+		pack.Reset()
 	} else {
 		pack = packet.New(512)
 	}

@@ -66,7 +66,7 @@ func FreeOnlyMine(pack *Packet) []byte {
 	if !atomic.CompareAndSwapUint32(&pack.freed, 0, 1) {
 		return nil
 	}
-	buf := pack.buf
+	buf := pack.buf[:pack.w]
 	pack.buf = nil
 	packetPool.Put(pack)
 	return buf

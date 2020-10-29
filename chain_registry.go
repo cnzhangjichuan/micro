@@ -87,9 +87,7 @@ func (r *registry) Handle(conn net.Conn, name string, pack *packet.Packet) bool 
 	r.Broadcast(pack, registryBisAdd, conn, srvName, address)
 
 	// 保活连接
-	if _, err := pack.ReadConnWithKeepAlive(conn); err != nil {
-		Debug("register keep-alive error %v", err)
-	}
+	pack.ReadConnWithKeepAlive(conn)
 
 	// 广播离开事件
 	r.Broadcast(pack, registryBisRemove, conn, srvName, address)

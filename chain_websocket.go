@@ -181,7 +181,6 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 	if err != nil {
 		freeDpoCache(cac)
 		w.freeWConn(wc)
-		Debug("handshake error %v", err)
 		return true
 	}
 

@@ -146,7 +146,6 @@ func processConn(conn net.Conn) {
 	pack.SetTimeout(TIMEOUT, TIMEOUT)
 	if err := pack.ReadHTTPHeader(conn); err != nil {
 		packet.Free(pack)
-		Debug("read http header error: %v", err)
 		return
 	}
 
