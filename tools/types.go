@@ -53,6 +53,16 @@ func (mixed *SI32) Get(x int) (string, int32) {
 	return mixed.str[x], mixed.i32[x]
 }
 
+// GetValue 获取指定名称的值
+func (mixed *SI32) GetValue(name string) int32 {
+	for i, n := range mixed.str {
+		if n == name {
+			return mixed.i32[i]
+		}
+	}
+	return 0
+}
+
 // SF32 string/float32值对
 type SF32 struct {
 	str []string
@@ -98,6 +108,16 @@ func (mixed *SF32) Get(x int) (string, float32) {
 		return "", 0
 	}
 	return mixed.str[x], mixed.f32[x]
+}
+
+// GetValue 获取指定名称的值
+func (mixed *SF32) GetValue(name string) float32 {
+	for i, n := range mixed.str {
+		if n == name {
+			return mixed.f32[i]
+		}
+	}
+	return 0
 }
 
 // TimesRate 次数/比例值对
