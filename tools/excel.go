@@ -76,11 +76,16 @@ func ExcelSaveToWithTypeIndex(r io.Reader, dst string, typeIndex int) error {
 // excelGetRowTypes 获取列类型
 func excelGetRowTypes(rows []*xlsx.Row, typeIndex int) (names, types []string) {
 	nCells, tCells := rows[1].Cells, rows[typeIndex].Cells
-	names = make([]string, len(nCells))
+	names = make([]string, 0, len(nCells))
 	types = make([]string, len(tCells))
 	for i, c := range nCells {
-		names[i] = c.String()
-		types[i] = tCells[i].String()
+		v := c.String()
+		if v != "" {
+			names = append(names, v)
+			types[i] = tCells[i].String()
+		} else {
+			types[i] = ""
+		}
 	}
 	return
 }
@@ -96,6 +101,8 @@ func excelWriteRowToPacket(pack *packet.Packet, row *xlsx.Row, types []string) {
 			} else {
 				pack.WriteI32(0)
 			}
+		case "":
+			// empty type, do nothing
 		case "float32", "float":
 			if len(cells) > i {
 				pack.WriteF32(xutils.ParseF32(cells[i].String(), 1))

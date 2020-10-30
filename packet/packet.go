@@ -3,9 +3,9 @@ package packet
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/micro/xutils"
 	"io"
 	"net"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -55,26 +55,6 @@ func Free(pack *Packet) {
 		pack.buf = nil
 	}
 	packetPool.Put(pack)
-}
-
-// FreeOnlyMine 仅仅释放自身(buff不会释放)
-// 返回里面的数据
-func FreeOnlyMine(pack *Packet) []byte {
-	if pack == nil {
-		return nil
-	}
-	if !atomic.CompareAndSwapUint32(&pack.freed, 0, 1) {
-		return nil
-	}
-	buf := pack.buf[:pack.w]
-	pack.buf = nil
-	packetPool.Put(pack)
-	return buf
-}
-
-// FreeBytes 释放数据
-func FreeBytes(bs []byte) {
-	putBytes(bs)
 }
 
 // Packet 数据包
@@ -249,7 +229,13 @@ func (p *Packet) Unescape(s []byte) int {
 
 // ReadHTTPBody 从网络中读取http格式的数据(body)
 func (p *Packet) ReadHTTPBody(conn net.Conn) (err error) {
-	bodySize := int(xutils.ParseI64(p.HTTPHeaderValue(httpHeadContentLength), 0))
+	var bodySize int
+	if i, er := strconv.Atoi(p.HTTPHeaderValue(httpHeadContentLength)); er == nil {
+		bodySize = i
+	} else {
+		bodySize = 0
+	}
+
 	if i := bytes.Index(p.buf[0:p.w], httpHeadEndAt); i < 0 {
 		p.Reset()
 	} else {

@@ -6,9 +6,8 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/micro/cast/cache"
-	"github.com/micro/cast/store"
 	"github.com/micro/packet"
+	"github.com/micro/store"
 	"github.com/micro/xutils"
 )
 
@@ -32,6 +31,7 @@ func startupService(onStartup func()) error {
 	}
 
 	// 数据存储
+	expired := time.Duration(env.config.Expired) * time.Second
 	if env.config.DBResource != "" {
 		if !store.IsBackupOnErrorSetted() {
 			store.SetBackupOnError(func(SQL string, err error) {
@@ -39,16 +39,16 @@ func startupService(onStartup func()) error {
 			})
 		}
 		if xutils.HasString(env.config.DBTables, userTableName) {
-			env.cache = cache.New(userTableName, time.Duration(env.config.Expired)*time.Second)
+			env.cache = packet.NewCache(expired, store.NewSaver(userTableName))
 		} else {
-			env.cache = cache.New("", time.Duration(env.config.Expired)*time.Second)
+			env.cache = packet.NewCache(expired, nil)
 		}
 		err = store.Init(env.config.DBResource, env.config.DBTables, env.config.DBSQLs)
 		if err != nil {
 			Debug("init db error %v", err)
 		}
 	} else {
-		env.cache = cache.New("", time.Duration(env.config.Expired)*time.Second)
+		env.cache = packet.NewCache(expired, nil)
 	}
 
 	// 调用启动前逻辑

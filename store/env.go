@@ -2,13 +2,14 @@ package store
 
 import (
 	"database/sql"
+	"hash/crc32"
 	"strconv"
 	"strings"
 	"sync"
+	"unsafe"
 
 	// PG数据库驱动
 	_ "github.com/lib/pq"
-	"github.com/micro/xutils"
 )
 
 const (
@@ -151,7 +152,10 @@ func addSQLToQueen(SQL string) {
 
 // tableSuffix 获取表名后辍
 func tableSuffix(id string) (suffix string) {
-	idx := xutils.HashCode32(id) % tableCount
+	x := (*[2]uintptr)(unsafe.Pointer(&id))
+	h := [3]uintptr{x[0], x[1], x[1]}
+
+	idx := crc32.ChecksumIEEE(*(*[]byte)(unsafe.Pointer(&h))) % tableCount
 	suffix = strconv.Itoa(int(idx))
 	return
 }

@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/micro/cast/cache"
 	"github.com/micro/packet"
 )
 
@@ -32,7 +31,7 @@ var env struct {
 	onLogout lgOutterCaller
 
 	// 会话
-	cache cache.Cache
+	cache packet.Cache
 
 	// 连接监听
 	lsr net.Listener
