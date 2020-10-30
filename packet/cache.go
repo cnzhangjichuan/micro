@@ -85,6 +85,11 @@ func hashCode32(s string) uint32 {
 	return crc32.ChecksumIEEE(*(*[]byte)(unsafe.Pointer(&h)))
 }
 
+// hashCode32BS 计算[]byte的hash值
+func hashCode32BS(s []byte) uint32 {
+	return crc32.ChecksumIEEE(s)
+}
+
 // chunk 缓存块
 type chunk struct {
 	sync.RWMutex
@@ -159,11 +164,14 @@ func (c *chunk) Put(k string, v Serializable) {
 // Put 设置数据到chunk中
 func (c *chunk) put(k string, v Serializable, saved bool) {
 	var (
-		pack *Packet
-		data []byte
-		ok   bool
+		pack      *Packet
+		data      []byte
+		ok        bool
+		hcs       = int(0)
+		oHashCode = uint32(0)
 	)
 
+	// 获取缓存中的数据
 	if data, ok = c.m[k]; ok {
 		pack = NewWithData(data)
 		pack.Reset()
@@ -173,18 +181,29 @@ func (c *chunk) put(k string, v Serializable, saved bool) {
 
 	// 设置过期时间
 	if c.expired > 0 {
+		hcs = 4
 		binary.BigEndian.PutUint32(pack.Allocate(4), uint32(time.Now().Add(c.expired).Unix()))
+	}
+
+	// 计算更新前的hashCode
+	// 如果更新后的hashCode与这个值不同，则更新数据到磁盘上
+	if saved && c.saver != nil && len(data) > hcs {
+		oHashCode = hashCode32BS(data[hcs:])
 	}
 
 	// 编码
 	v.Encode(pack)
-	c.m[k] = pack.buf[:pack.w]
+	data = pack.buf[:pack.w]
 	pack.buf = nil
+	c.m[k] = data
 	Free(pack)
 
 	// 更新数据到磁盘上
-	if saved && c.saver != nil {
-		c.saver.Save(v, k)
+	if saved && c.saver != nil && len(data) > hcs {
+		nHashCode := hashCode32BS(data[hcs:])
+		if nHashCode != oHashCode {
+			c.saver.Save(v, k)
+		}
 	}
 }
 
