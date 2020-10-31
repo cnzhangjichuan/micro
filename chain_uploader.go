@@ -89,8 +89,18 @@ func RegisterUploadFunc(name string, f uploadFunc) {
 	}
 }
 
+// RequestUploadService 上传文件
+func RequestUploadService(remoteAddress, mask string, apiAndFiles []string) {
+	env.authorize.Init(mask)
+	for i := 1; i < len(apiAndFiles); i += 2 {
+		err := requestUploadService(apiAndFiles[i-1], apiAndFiles[i], remoteAddress)
+		Log(err)
+	}
+	Log("all files uploaded!")
+}
+
 // 上传文件
-func RequestUploadService(api, fileName, remoteAddress string) error {
+func requestUploadService(api, fileName, remoteAddress string) error {
 	fd, err := os.Open(fileName)
 	if err != nil {
 		return err
