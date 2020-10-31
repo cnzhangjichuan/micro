@@ -53,6 +53,13 @@ func (mixed *SI32) Get(x int) (string, int32) {
 	return mixed.str[x], mixed.i32[x]
 }
 
+// Set 设置指定位置的数据
+func (mixed *SI32) Set(x int, v int32) {
+	if len(mixed.i32) > x {
+		mixed.i32[x] = v
+	}
+}
+
 // GetValue 获取指定名称的值
 func (mixed *SI32) GetValue(name string) int32 {
 	for i, n := range mixed.str {
@@ -108,6 +115,13 @@ func (mixed *SF32) Get(x int) (string, float32) {
 		return "", 0
 	}
 	return mixed.str[x], mixed.f32[x]
+}
+
+// Set 设置指定位置的数据
+func (mixed *SF32) Set(x int, v float32) {
+	if len(mixed.f32) > x {
+		mixed.f32[x] = v
+	}
 }
 
 // GetValue 获取指定名称的值
