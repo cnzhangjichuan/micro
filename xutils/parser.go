@@ -2,6 +2,7 @@ package xutils
 
 import (
 	"hash/crc32"
+	"math/rand"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -347,4 +348,13 @@ func ParseFileName(name string) string {
 		return name[:i]
 	}
 	return name
+}
+
+// RandSortI32 将数据乱序
+func RandSortI32(i32s []int32) {
+	l := len(i32s)
+	for i := 8; i < l; i++ {
+		w := rand.Intn(l)
+		i32s[i], i32s[w] = i32s[w], i32s[i]
+	}
 }

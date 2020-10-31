@@ -90,12 +90,12 @@ func RegisterUploadFunc(name string, f uploadFunc) {
 }
 
 // 上传文件
-func requestUploadService(api, fileName string) error {
+func RequestUploadService(api, fileName, remoteAddress string) error {
 	fd, err := os.Open(fileName)
 	if err != nil {
 		return err
 	}
-	conn, err := net.DialTimeout("tcp", localeAddress(), time.Second)
+	conn, err := net.DialTimeout("tcp", remoteAddress, time.Second)
 	if err != nil {
 		fd.Close()
 		return errors.New("service not found, it may be closed")

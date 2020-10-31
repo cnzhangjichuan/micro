@@ -36,7 +36,7 @@ func Service(onStartup func()) error {
 
 	case `upload`:
 		// 上传文件
-		return requestUploadService(op, param)
+		return RequestUploadService(op, param, localeAddress())
 
 	case `help`:
 		Log("\n" +

@@ -51,7 +51,7 @@ func ExcelSaveToWithTypeIndex(r io.Reader, dst string, typeIndex int) error {
 		return errExcelEmptyData
 	}
 	rows := xf.Sheets[0].Rows
-	if len(rows) < 4 {
+	if len(rows) < typeIndex+1 {
 		packet.Free(pack)
 		return errExcelEmptyData
 	}
@@ -63,8 +63,17 @@ func ExcelSaveToWithTypeIndex(r io.Reader, dst string, typeIndex int) error {
 
 	// 设置数据
 	rowStart := typeIndex + 1
-	pack.WriteU64(uint64(len(rows) - rowStart))
+	// 获取真实的行号
+	rowLast := rowStart
 	for r := rowStart; r < len(rows); r++ {
+		cs := rows[r].Cells
+		if len(cs) == 0 || cs[0].String() == "" {
+			break
+		}
+		rowLast++
+	}
+	pack.WriteU64(uint64(rowLast - rowStart))
+	for r := rowStart; r < rowLast; r++ {
 		excelWriteRowToPacket(pack, rows[r], types)
 	}
 	err = pack.SaveToFile(dst)
@@ -83,6 +92,9 @@ func excelGetRowTypes(rows []*xlsx.Row, typeIndex int) (names, types []string) {
 		if v != "" {
 			names = append(names, v)
 			types[i] = tCells[i].String()
+			if types[i] == "" {
+				types[i] = "string"
+			}
 		} else {
 			types[i] = ""
 		}
@@ -92,35 +104,27 @@ func excelGetRowTypes(rows []*xlsx.Row, typeIndex int) (names, types []string) {
 
 // excelWriteRowToPacket 将Excel内容写入到packet中
 func excelWriteRowToPacket(pack *packet.Packet, row *xlsx.Row, types []string) {
-	cells := row.Cells
+	var (
+		cells = row.Cells
+		v     string
+	)
 	for i, typ := range types {
+		if len(cells) > i {
+			v = cells[i].String()
+		} else {
+			v = ""
+		}
 		switch typ {
 		default:
-			if len(cells) > i {
-				pack.WriteI32(xutils.ParseI32(cells[i].String(), 1))
-			} else {
-				pack.WriteI32(0)
-			}
+			pack.WriteI32(xutils.ParseI32(v, 0))
 		case "":
 			// empty type, do nothing
 		case "float32", "float":
-			if len(cells) > i {
-				pack.WriteF32(xutils.ParseF32(cells[i].String(), 1))
-			} else {
-				pack.WriteF32(0)
-			}
+			pack.WriteF32(xutils.ParseF32(v, 0))
 		case "float64":
-			if len(cells) > i {
-				pack.WriteF64(xutils.ParseF64(cells[i].String(), 1))
-			} else {
-				pack.WriteF64(0)
-			}
+			pack.WriteF64(xutils.ParseF64(v, 1))
 		case "string", "strings":
-			if len(cells) > i {
-				pack.WriteString(cells[i].String())
-			} else {
-				pack.WriteString("")
-			}
+			pack.WriteString(v)
 		}
 	}
 }
