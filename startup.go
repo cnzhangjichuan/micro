@@ -8,13 +8,10 @@ import (
 
 	"github.com/micro/packet"
 	"github.com/micro/store"
-	"github.com/micro/xutils"
 )
 
 // startupService 启动服务
 func startupService(onStartup func()) error {
-	const userTableName = `users`
-
 	err := loadConfig()
 	if err != nil {
 		Debug("load config error: %v", err)
@@ -31,25 +28,23 @@ func startupService(onStartup func()) error {
 	}
 
 	// 数据存储
-	expired := time.Duration(env.config.Expired) * time.Second
+	userTableName := env.config.UserTabName
 	if env.config.DBResource != "" {
 		if !store.IsBackupOnErrorSetted() {
 			store.SetBackupOnError(func(SQL string, err error) {
 				Logf(">> SQL execute error:\n[%s]\n%v", SQL, err)
 			})
 		}
-		if xutils.HasString(env.config.DBTables, userTableName) {
-			env.cache = packet.NewCache(expired, store.NewSaver(userTableName))
-		} else {
-			env.cache = packet.NewCache(expired, nil)
-		}
-		err = store.Init(env.config.DBResource, env.config.DBTables, env.config.DBSQLs)
+		err = store.Init(env.config.DBResource, env.config.DBSQLs)
 		if err != nil {
+			userTableName = ""
 			Debug("init db error %v", err)
 		}
 	} else {
-		env.cache = packet.NewCache(expired, nil)
+		userTableName = ""
 	}
+	userExpired := time.Duration(env.config.Expired) * time.Second
+	env.cache = packet.NewCache(userExpired, store.NewSaver(userTableName))
 
 	// 调用启动前逻辑
 	if onStartup != nil {

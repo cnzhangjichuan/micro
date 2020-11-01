@@ -19,7 +19,7 @@ var env struct {
 		Expired     int
 		Mask        string
 		DBResource  string
-		DBTables    []string
+		UserTabName string
 		DBSQLs      []string
 	}
 

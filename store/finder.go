@@ -5,65 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
-
-	"github.com/micro/packet"
 )
-
-// Save 保存数据
-func Save(data interface{}, tabName, id string) (err error) {
-	pack := packet.New(1024)
-	_, err = pack.EncodeJSON(data, false, false)
-	if err != nil {
-		return err
-	}
-	tx := Ignore(string(pack.Data()))
-	packet.Free(pack)
-
-	seq := tableSuffix(id)
-	id = Ignore(id)
-
-	env.RLock()
-	addSQLToQueen(strings.Join([]string{
-		`insert into `, tabName, seq,
-		` values('`, id, `','`, tx, `')`,
-		` on conflict(id) do update set value='`, tx, `'`,
-	}, ""))
-	env.RUnlock()
-
-	return
-}
-
-// Load 加载数据
-func Load(v interface{}, tabName, id string) bool {
-	env.RLock()
-	if env.db == nil {
-		env.RUnlock()
-		return false
-	}
-	suffix := tableSuffix(id)
-	r, err := env.db.Query(strings.Join([]string{
-		`select value from `, Ignore(tabName), suffix, ` where id='`, Ignore(id), `'`,
-	}, ""))
-	env.RUnlock()
-
-	if err != nil {
-		return false
-	}
-	if !r.Next() {
-		r.Close()
-		return false
-	}
-
-	var data []byte
-	r.Scan(&data)
-	r.Close()
-
-	pack := packet.NewWithData(data)
-	err = pack.DecodeJSON(v)
-	packet.Free(pack)
-
-	return err == nil
-}
 
 var errNotInitialized = errors.New("store not initialized")
 

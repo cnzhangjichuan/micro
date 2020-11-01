@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"hash/crc32"
 	"strconv"
-	"strings"
 	"sync"
 	"unsafe"
 
@@ -43,9 +42,8 @@ func SetBackupOnError(f funcBackupOnError) {
 
 // Init 打开数据库
 // host=localhost port=5432 user=postgres password=postgres dbname=games_test sslmode=disable
-// tabs 需要创建的表集合
 // sqls 需要执行的SQL语句
-func Init(resource string, tabs, sqls []string) (err error) {
+func Init(resource string, sqls []string) (err error) {
 	env.Lock()
 	if env.db != nil {
 		env.Unlock()
@@ -60,16 +58,6 @@ func Init(resource string, tabs, sqls []string) (err error) {
 		env.db = nil
 		env.Unlock()
 		return
-	}
-
-	// 创建数据表(仅表名)
-	for _, tab := range tabs {
-		for i := 0; i < tableCount; i++ {
-			env.db.Exec(strings.Join([]string{
-				`create table `, tab, strconv.Itoa(i),
-				`(id varchar(20) unique,value text)`,
-			}, ""))
-		}
 	}
 
 	// 执行SQLs
