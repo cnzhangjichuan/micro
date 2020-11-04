@@ -37,16 +37,27 @@ func (mixed *SI32) Parse(s string) {
 		return
 	}
 
-	items := strings.Split(s, ";")
-	mixed.str = make([]string, len(items))
-	mixed.i32 = make([]int32, len(items))
-	for x, v := range items {
-		in := strings.Split(v, ",")
-		mixed.str[x] = in[0]
-		if len(in) > 1 {
-			mixed.i32[x] = xutils.ParseI32(in[1], 0)
-		} else {
-			mixed.i32[x] = 0
+	if strings.Index(s, ";") >= 0 {
+		items := strings.Split(s, ";")
+		mixed.str = make([]string, len(items))
+		mixed.i32 = make([]int32, len(items))
+		for x, v := range items {
+			in := strings.Split(v, ",")
+			mixed.str[x] = in[0]
+			if len(in) > 1 {
+				mixed.i32[x] = xutils.ParseI32(in[1], 0)
+			} else {
+				mixed.i32[x] = 0
+			}
+		}
+	} else {
+		items := strings.Split(s, ",")
+		l := len(items) / 2
+		mixed.str = make([]string, 0, l)
+		mixed.i32 = make([]int32, 0, l)
+		for i := 1; i < len(items); i += 2 {
+			mixed.str = append(mixed.str, items[i-1])
+			mixed.i32 = append(mixed.i32, xutils.ParseI32(items[i], 0))
 		}
 	}
 }
@@ -101,16 +112,27 @@ func (mixed *SF32) Parse(s string) {
 		return
 	}
 
-	items := strings.Split(s, ";")
-	mixed.str = make([]string, len(items))
-	mixed.f32 = make([]float32, len(items))
-	for x, v := range items {
-		in := strings.Split(v, ",")
-		mixed.str[x] = in[0]
-		if len(in) > 1 {
-			mixed.f32[x] = xutils.ParseF32(in[1], 0)
-		} else {
-			mixed.f32[x] = 0
+	if strings.Index(s, ";") >= 0 {
+		items := strings.Split(s, ";")
+		mixed.str = make([]string, len(items))
+		mixed.f32 = make([]float32, len(items))
+		for x, v := range items {
+			in := strings.Split(v, ",")
+			mixed.str[x] = in[0]
+			if len(in) > 1 {
+				mixed.f32[x] = xutils.ParseF32(in[1], 0)
+			} else {
+				mixed.f32[x] = 0
+			}
+		}
+	} else {
+		items := strings.Split(s, ",")
+		l := len(items) / 2
+		mixed.str = make([]string, 0, l)
+		mixed.f32 = make([]float32, 0, l)
+		for i := 1; i < len(items); i += 2 {
+			mixed.str = append(mixed.str, items[i-1])
+			mixed.f32 = append(mixed.f32, xutils.ParseF32(items[i], 0))
 		}
 	}
 }
@@ -164,16 +186,27 @@ func (mixed *I32F32) Parse(s string) {
 		mixed.f32 = make([]float32, 0)
 		return
 	}
-	items := strings.Split(s, ";")
-	mixed.i32 = make([]int32, len(items))
-	mixed.f32 = make([]float32, len(items))
-	for x, v := range items {
-		in := strings.Split(v, ",")
-		mixed.i32[x] = xutils.ParseI32(in[0], 1)
-		if len(in) > 1 {
-			mixed.f32[x] = xutils.ParseF32(in[1], 0)
-		} else {
-			mixed.f32[x] = 0
+	if strings.Index(s, ";") >= 0 {
+		items := strings.Split(s, ";")
+		mixed.i32 = make([]int32, len(items))
+		mixed.f32 = make([]float32, len(items))
+		for x, v := range items {
+			in := strings.Split(v, ",")
+			mixed.i32[x] = xutils.ParseI32(in[0], 1)
+			if len(in) > 1 {
+				mixed.f32[x] = xutils.ParseF32(in[1], 0)
+			} else {
+				mixed.f32[x] = 0
+			}
+		}
+	} else {
+		items := strings.Split(s, ",")
+		l := len(items) / 2
+		mixed.i32 = make([]int32, 0, l)
+		mixed.f32 = make([]float32, 0, l)
+		for i := 1; i < len(items); i += 2 {
+			mixed.i32 = append(mixed.i32, xutils.ParseI32(items[i-1], 0))
+			mixed.f32 = append(mixed.f32, xutils.ParseF32(items[i], 0))
 		}
 	}
 }

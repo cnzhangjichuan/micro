@@ -58,52 +58,58 @@ func ExcelSaveToWithTypeIndex(r io.Reader, dst string, typeIndex int) error {
 	pack.Reset()
 
 	// 设置列名信息
-	names, types := excelGetRowTypes(rows, typeIndex)
+	names, types := excelGetTitle(rows, typeIndex)
 	pack.WriteStrings(names)
 
-	// 设置数据
-	rowStart := typeIndex + 1
 	// 获取真实的行号
-	rowLast := rowStart
-	for r := rowStart; r < len(rows); r++ {
+	s := typeIndex + 1
+	e := s
+	for r := s; r < len(rows); r++ {
 		cs := rows[r].Cells
 		if len(cs) == 0 || cs[0].String() == "" {
 			break
 		}
-		rowLast++
+		e++
 	}
-	pack.WriteU64(uint64(rowLast - rowStart))
-	for r := rowStart; r < rowLast; r++ {
-		excelWriteRowToPacket(pack, rows[r], types)
+	// 写入数据大小
+	pack.WriteU64(uint64(e - s))
+
+	// 写入行数据
+	for r := s; r < e; r++ {
+		excelWriteRow(pack, rows[r], types)
 	}
+
+	// 保存到文件
 	err = pack.SaveToFile(dst)
 	packet.Free(pack)
 
 	return err
 }
 
-// excelGetRowTypes 获取列类型
-func excelGetRowTypes(rows []*xlsx.Row, typeIndex int) (names, types []string) {
+// excelGetRowTypes 获取表头信息
+func excelGetTitle(rows []*xlsx.Row, typeIndex int) (names, types []string) {
 	nCells, tCells := rows[1].Cells, rows[typeIndex].Cells
 	names = make([]string, 0, len(nCells))
 	types = make([]string, len(tCells))
 	for i, c := range nCells {
 		v := c.String()
 		if v != "" {
-			names = append(names, v)
 			types[i] = tCells[i].String()
 			if types[i] == "" {
-				types[i] = "string"
+				types[i] = "ignore"
+			}
+			if types[i] != "ignore" {
+				names = append(names, v)
 			}
 		} else {
-			types[i] = ""
+			types[i] = "ignore"
 		}
 	}
 	return
 }
 
-// excelWriteRowToPacket 将Excel内容写入到packet中
-func excelWriteRowToPacket(pack *packet.Packet, row *xlsx.Row, types []string) {
+// excelWriteRow 将一行内容写入到packet中
+func excelWriteRow(pack *packet.Packet, row *xlsx.Row, types []string) {
 	var (
 		cells = row.Cells
 		v     string
@@ -117,8 +123,8 @@ func excelWriteRowToPacket(pack *packet.Packet, row *xlsx.Row, types []string) {
 		switch typ {
 		default:
 			pack.WriteI32(xutils.ParseI32(v, 0))
-		case "":
-			// empty type, do nothing
+		case "ignore":
+			// 忽略该列数据
 		case "float32", "float":
 			pack.WriteF32(xutils.ParseF32(v, 0))
 		case "float64":
