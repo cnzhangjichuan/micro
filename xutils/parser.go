@@ -219,13 +219,18 @@ func ParseBools(s string) (ret []bool) {
 
 // HasString 是否含有指定元素
 func HasString(arr []string, item string) bool {
+	return IndexStrings(arr, item) >= 0
+}
+
+// IndexStrings 元素在列表中的位置
+func IndexStrings(arr []string, item string) int {
 	al := len(arr)
 	for i := 0; i < al; i++ {
 		if arr[i] == item {
-			return true
+			return i
 		}
 	}
-	return false
+	return -1
 }
 
 // HasU32 是否含有指定元素
@@ -333,6 +338,21 @@ func AddFirstItem(ss []string, s string) []string {
 	}
 	ss[0] = s
 	return ss
+}
+
+// 将string->[]string，并去除空元素
+func SplitN(s string) []string {
+	if s == "" {
+		return nil
+	}
+	sa := strings.Split(s, ",")
+	ret := make([]string, 0, len(sa))
+	for _, v := range sa {
+		if v != "" {
+			ret = append(ret, v)
+		}
+	}
+	return ret
 }
 
 // ParseFileName 提取文件名称

@@ -18,6 +18,17 @@ func (mixed *SI32) Add(s string, i int32) {
 	mixed.i32 = append(mixed.i32, i)
 }
 
+// Add 添加数据
+func (mixed *SI32) Merge(s string, i int32) {
+	for x := 0; x < len(mixed.str); x++ {
+		if mixed.str[x] == s {
+			mixed.i32[x] += i
+			return
+		}
+	}
+	mixed.Add(s, i)
+}
+
 // Parse 解析数据
 func (mixed *SI32) Parse(s string) {
 	if s == "" {

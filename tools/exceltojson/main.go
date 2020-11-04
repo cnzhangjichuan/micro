@@ -13,38 +13,40 @@ import (
 // 将excel数据转成json
 func main() {
 	const (
-		src = `./总表.xlsx`
+		src = `../tables`
 		dst = `../assets/script/service/configs`
 	)
 
 	// 创建目录
 	os.MkdirAll(dst, os.ModePerm)
 
-	xf, err := xlsx.OpenFile(src)
-	if err != nil {
-		fmt.Println("源文件解析失败：", err)
-		return
-	}
-
-	if len(xf.Sheets) == 0 {
-		fmt.Println("没有可用的Sheet")
-		return
-	}
-
-	for i := 0; i < len(xf.Sheets); i++ {
-		sheet := xf.Sheets[i]
-		fileName := xutils.ParseFileName(sheet.Name)
-		if fileName == "" {
-			// 没有配置文件名
-			continue
-		}
-		err = parseToJSON(sheet.Rows, filepath.Join(dst, fileName+".js"))
+	// 处理目录文件
+	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			fmt.Printf("转换成JSON时出错[%s]: %v\n", fileName, err)
-			return
+			return err
 		}
+		if !strings.HasSuffix(path, ".xlsx") {
+			return nil
+		}
+		name := xutils.ParseFileName(info.Name())
+		if name == "" {
+			return nil
+		}
+		xf, err := xlsx.OpenFile(path)
+		if err != nil {
+			fmt.Println("源文件解析失败：", err)
+			return err
+		}
+		if len(xf.Sheets) == 0 {
+			return nil
+		}
+		return parseToJSON(xf.Sheets[0].Rows, filepath.Join(dst, name+".js"))
+	})
+	if err == nil {
+		fmt.Println("数据转化成功!")
+	} else {
+		fmt.Println("数据处理失败", err)
 	}
-	fmt.Println("数据转化成功!")
 }
 
 // parseToJSON 生成json文件
