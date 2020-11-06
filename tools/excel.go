@@ -90,7 +90,7 @@ func ExcelSaveToWithTypeIndex(r io.Reader, dst string, typeIndex int) error {
 func excelGetTitle(rows []*xlsx.Row, typeIndex int) (names, types []string) {
 	nCells, tCells := rows[1].Cells, rows[typeIndex].Cells
 	names = make([]string, 0, len(nCells))
-	types = make([]string, len(names))
+	types = make([]string, cap(names))
 	for i, c := range nCells {
 		v := c.String()
 		if v != "" {
