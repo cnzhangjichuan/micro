@@ -90,11 +90,13 @@ func ExcelSaveToWithTypeIndex(r io.Reader, dst string, typeIndex int) error {
 func excelGetTitle(rows []*xlsx.Row, typeIndex int) (names, types []string) {
 	nCells, tCells := rows[1].Cells, rows[typeIndex].Cells
 	names = make([]string, 0, len(nCells))
-	types = make([]string, len(tCells))
+	types = make([]string, len(names))
 	for i, c := range nCells {
 		v := c.String()
 		if v != "" {
-			types[i] = tCells[i].String()
+			if len(tCells) > i {
+				types[i] = tCells[i].String()
+			}
 			if types[i] == "" {
 				types[i] = "ignore"
 			}
@@ -122,15 +124,17 @@ func excelWriteRow(pack *packet.Packet, row *xlsx.Row, types []string) {
 		}
 		switch typ {
 		default:
-			pack.WriteI32(xutils.ParseI32(v, 0))
+			pack.WriteString(v)
 		case "ignore":
 			// 忽略该列数据
 		case "float32", "float":
 			pack.WriteF32(xutils.ParseF32(v, 0))
 		case "float64":
 			pack.WriteF64(xutils.ParseF64(v, 1))
-		case "string", "strings":
-			pack.WriteString(v)
+		case "int", "int32":
+			pack.WriteI32(xutils.ParseI32(v, 0))
+		case "int64":
+			pack.WriteI64(xutils.ParseI64(v, 0))
 		}
 	}
 }

@@ -14,7 +14,7 @@ import (
 func main() {
 	const (
 		src = `../tables`
-		dst = `../assets/script/service/configs`
+		dst = `../assets/script/core/configs`
 	)
 
 	// 创建目录

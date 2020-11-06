@@ -12,63 +12,21 @@ import (
 
 // startupService 启动服务
 func startupService(onStartup func()) error {
-	err := loadConfig()
-	if err != nil {
-		Debug("load config error: %v", err)
-	}
+	var (
+		lsr  net.Listener
+		conn net.Conn
+		err  error
+	)
 
-	env.lsr, err = net.Listen("tcp", env.config.Address)
+	// 初始化store
+	lsr, err = createService(onStartup)
 	if err != nil {
 		return err
 	}
 
-	// Session会话
-	if env.config.Expired < 0 {
-		env.config.Expired = 0
-	}
-
-	// 数据存储
-	userTableName := env.config.UserTabName
-	if env.config.DBResource != "" {
-		if !store.IsBackupOnErrorSetted() {
-			store.SetBackupOnError(func(SQL string, err error) {
-				Logf(">> SQL execute error:\n[%s]\n%v", SQL, err)
-			})
-		}
-		err = store.Init(env.config.DBResource, env.config.DBSQLs)
-		if err != nil {
-			userTableName = ""
-			Debug("init db error %v", err)
-		}
-	} else {
-		userTableName = ""
-	}
-	userExpired := time.Duration(env.config.Expired) * time.Second
-	env.cache = packet.NewCache(userExpired, store.NewSaver(userTableName))
-
-	// 调用启动前逻辑
-	if onStartup != nil {
-		onStartup()
-	}
-
-	// 初始化处理器
-	env.chains = []chain{
-		&http{},
-		&env.rpc,
-		&websocket{},
-		&env.registry,
-		&closer{},
-		&reloader{},
-		&uploader{},
-	}
-	for i := 0; i < len(env.chains); i++ {
-		env.chains[i].Init()
-	}
-
 	// 处理请求
-	var conn net.Conn
 	for {
-		conn, err = env.lsr.Accept()
+		conn, err = lsr.Accept()
 		if err != nil {
 			if e, ok := err.(net.Error); ok && e.Temporary() {
 				time.Sleep(time.Second)
@@ -93,14 +51,73 @@ func startupService(onStartup func()) error {
 		}(conn)
 	}
 
-	// 清理资源
+	// 销毁服务
+	destroyService()
+
+	return errors.New("service is down")
+}
+
+// createService 创建服务
+func createService(onStartup func()) (net.Listener, error) {
+	err := loadConfig()
+	if err != nil {
+		Debug("load config error: %v", err)
+	}
+
+	// Session会话
+	if env.config.Expired < 0 {
+		env.config.Expired = 0
+	}
+
+	// 数据存储
+	userTableName := env.config.UserTabName
+	if env.config.DBResource != "" {
+		if !store.IsBackupOnErrorSetted() {
+			store.SetBackupOnError(func(SQL string, err error) {
+				Logf(">> SQL execute error:\n[%s]\n%v", SQL, err)
+			})
+		}
+		err := store.Init(env.config.DBResource, env.config.DBSQLs)
+		if err != nil {
+			userTableName = ""
+			Debug("init db error %v", err)
+		}
+	} else {
+		userTableName = ""
+	}
+	userExpired := time.Duration(env.config.Expired) * time.Second
+	env.cache = packet.NewCache(userExpired, store.NewSaver(userTableName))
+
+	// 调用外部初始化
+	if onStartup != nil {
+		onStartup()
+	}
+
+	// 初始化处理器
+	env.chains = []chain{
+		&http{},
+		&env.rpc,
+		&websocket{},
+		&env.registry,
+		&closer{},
+		&reloader{},
+		&uploader{},
+	}
+	for i := 0; i < len(env.chains); i++ {
+		env.chains[i].Init()
+	}
+
+	env.lsr, err = net.Listen("tcp", env.config.Address)
+	return env.lsr, err
+}
+
+// destroyService 销毁服务
+func destroyService() {
 	env.lsr.Close()
 	for i := 0; i < len(env.chains); i++ {
 		env.chains[i].Close()
 	}
 	store.Close()
-
-	return errors.New("service is down")
 }
 
 type bisDpo func(dpo Dpo) (resp interface{}, errCode string)
@@ -118,7 +135,7 @@ func Register(api string, df bisDpo) {
 			pack := packet.New(1024)
 			buf := pack.Allocate(1024)
 			buf = buf[:runtime.Stack(buf, false)]
-			Debug("\nhande [%s] error: %v\n%s\n\n", api, err, buf)
+			Debug("\nhandle [%s] error: %v\n%s\n\n", api, err, buf)
 			packet.Free(pack)
 			errCode = errUNKNOWN
 		}()

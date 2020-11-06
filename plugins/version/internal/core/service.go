@@ -1,4 +1,4 @@
-package service
+package core
 
 import (
 	"crypto/md5"
@@ -105,7 +105,7 @@ func (v *VersionService) UploadFile(reader io.Reader) error {
 	}
 
 	pack := packet.New(1024)
-	io.CopyBuffer(fd, reader, pack.Allocate(1024))
+	_, err = io.CopyBuffer(fd, reader, pack.Allocate(1024))
 	packet.Free(pack)
 	fd.Close()
 
