@@ -13,20 +13,37 @@ var aliasMethodsPool = sync.Pool{
 
 // RandIndexWithProb 通过概率获取随机索引
 func RandIndexWithProb(prob []float32) int {
-	as := aliasMethodsPool.Get().(*AliasMethods)
-	as.InitWithProb(prob)
-	rdx := as.RandIndex()
-	aliasMethodsPool.Put(as)
-	return rdx
+	switch len(prob) {
+	default:
+		as := aliasMethodsPool.Get().(*AliasMethods)
+		as.InitWithProb(prob)
+		rdx := as.RandIndex()
+		aliasMethodsPool.Put(as)
+		return rdx
+	case 0:
+		return -1
+	case 1:
+		if rand.Float32() < prob[0] {
+			return 0
+		}
+		return -1
+	}
 }
 
 // RandIndexWithWeight 通过权重获取随机索引
 func RandIndexWithWeight(weight []int32) int {
-	as := aliasMethodsPool.Get().(*AliasMethods)
-	as.InitWithWeight(weight)
-	rdx := as.RandIndex()
-	aliasMethodsPool.Put(as)
-	return rdx
+	switch len(weight) {
+	default:
+		as := aliasMethodsPool.Get().(*AliasMethods)
+		as.InitWithWeight(weight)
+		rdx := as.RandIndex()
+		aliasMethodsPool.Put(as)
+		return rdx
+	case 0:
+		return -1
+	case 1:
+		return 0
+	}
 }
 
 // AliasMethods 别名采样
