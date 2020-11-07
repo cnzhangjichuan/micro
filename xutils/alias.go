@@ -69,6 +69,9 @@ func (a *AliasMethods) RandIndex() int {
 // InitWithWeight 能过权重初始化采样表
 func (a *AliasMethods) InitWithWeight(weights []int32) {
 	if len(weights) == 0 {
+		if len(a.prob) > 0 {
+			a.prob = a.prob[:0]
+		}
 		return
 	}
 
@@ -91,6 +94,9 @@ func (a *AliasMethods) InitWithWeight(weights []int32) {
 func (a *AliasMethods) InitWithProb(prob []float32) {
 	l := len(prob)
 	if l == 0 {
+		if len(a.prob) > 0 {
+			a.prob = a.prob[:0]
+		}
 		return
 	}
 	if cap(a.prob) >= l {
