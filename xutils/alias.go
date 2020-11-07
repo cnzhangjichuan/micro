@@ -1,15 +1,44 @@
 package xutils
 
-import "math/rand"
+import (
+	"math/rand"
+	"sync"
+)
 
-// AliasSample 别名采样
-type AliasSample struct {
+var aliasMethodsPool = sync.Pool{
+	New: func() interface{} {
+		return &AliasMethods{}
+	},
+}
+
+// RandIndexWithProb 通过概率获取随机索引
+func RandIndexWithProb(prob []float32) int {
+	as := aliasMethodsPool.Get().(*AliasMethods)
+	as.InitWithProb(prob)
+	rdx := as.RandIndex()
+	aliasMethodsPool.Put(as)
+	return rdx
+}
+
+// RandIndexWithWeight 通过权重获取随机索引
+func RandIndexWithWeight(weight []int32) int {
+	as := aliasMethodsPool.Get().(*AliasMethods)
+	as.InitWithWeight(weight)
+	rdx := as.RandIndex()
+	aliasMethodsPool.Put(as)
+	return rdx
+}
+
+// AliasMethods 别名采样
+type AliasMethods struct {
 	prob  []float32
 	alias []int
+	sms   []int
+	bgs   []int
 }
 
 // RandIndex 随机产生索引
-func (a *AliasSample) RandIndex() int {
+func (a *AliasMethods) RandIndex() int {
 	if len(a.prob) == 0 {
 		return -1
 	}
@@ -21,7 +50,7 @@ func (a *AliasSample) RandIndex() int {
 }
 
 // InitWithWeight 能过权重初始化采样表
-func (a *AliasSample) InitWithWeight(weights []int32) {
+func (a *AliasMethods) InitWithWeight(weights []int32) {
 	if len(weights) == 0 {
 		return
 	}
@@ -42,48 +71,53 @@ func (a *AliasSample) InitWithWeight(weights []int32) {
 }
 
 // InitWithProb 通过概率初始化采样表
-func (a *AliasSample) InitWithProb(prob []float32) {
+func (a *AliasMethods) InitWithProb(prob []float32) {
 	l := len(prob)
 	if l == 0 {
 		return
 	}
-	a.prob = make([]float32, l)
-	a.alias = make([]int, l)
-	sms := make([]int, 0, l)
-	bgs := make([]int, 0, 1)
-	for i := 0; i < l; i++ {
-		a.alias[i] = -1
+	if cap(a.prob) >= l {
+		a.prob = a.prob[:l]
+		a.alias = a.alias[:l]
+		a.sms = a.sms[:0]
+		a.bgs = a.bgs[:0]
+	} else {
+		a.prob = make([]float32, l)
+		a.alias = make([]int, l)
+		a.sms = make([]int, 0, l)
+		a.bgs = make([]int, 0, 1)
 	}
 
 	lf := float32(l)
 	for i := 0; i < l; i++ {
 		prob[i] *= lf
 		if prob[i] <= 1 {
-			sms = append(sms, i)
+			a.sms = append(a.sms, i)
 		} else {
-			bgs = append(bgs, i)
+			a.bgs = append(a.bgs, i)
 		}
+		a.prob[i] = -1
+		a.alias[i] = -1
 	}
 
-	var sdx, bdx int
-	for len(sms) > 0 && len(bgs) > 0 {
-		sdx, bdx = sms[0], bgs[0]
-		sms = append(sms[:0], sms[1:]...)
-		bgs = append(bgs[:0], bgs[1:]...)
+	for len(a.sms) > 0 && len(a.bgs) > 0 {
+		sdx, bdx := a.sms[0], a.bgs[0]
+		a.sms = append(a.sms[:0], a.sms[1:]...)
+		a.bgs = append(a.bgs[:0], a.bgs[1:]...)
 		a.prob[sdx] = prob[sdx]
 		a.alias[sdx] = bdx
 		prob[bdx] += prob[sdx] - 1
 		if prob[bdx] <= 1 {
-			sms = append(sms, bdx)
+			a.sms = append(a.sms, bdx)
 		} else {
-			bgs = append(bgs, bdx)
+			a.bgs = append(a.bgs, bdx)
 		}
 	}
 
-	for _, idx := range sms {
+	for _, idx := range a.sms {
 		a.prob[idx] = prob[idx]
 	}
-	for _, idx := range bgs {
+	for _, idx := range a.bgs {
 		a.prob[idx] = prob[idx]
 	}
 }

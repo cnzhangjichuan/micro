@@ -18,7 +18,7 @@ func startupService(onStartup func()) error {
 		err  error
 	)
 
-	// 初始化store
+	// 创建服务
 	lsr, err = createService(onStartup)
 	if err != nil {
 		return err
@@ -77,7 +77,7 @@ func createService(onStartup func()) (net.Listener, error) {
 				Logf(">> SQL execute error:\n[%s]\n%v", SQL, err)
 			})
 		}
-		err := store.Init(env.config.DBResource, env.config.DBSQLs)
+		err = store.Init(env.config.DBResource, env.config.DBSQLs)
 		if err != nil {
 			userTableName = ""
 			Debug("init db error %v", err)
