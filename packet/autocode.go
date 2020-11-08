@@ -165,6 +165,10 @@ func (c *codec) parseFile(ss []structure, buf *bufio.Reader) []structure {
 
 // encodeFields 对结构体字段进行编码
 func (c *codec) encodeFields(fd *bufio.Writer, ft []string) {
+	fChar := ft[0][0]
+	if fChar < 'A' || fChar > 'Z' {
+		return
+	}
 	switch ft[1] {
 	default:
 		if strings.HasPrefix(ft[1], "map[") {
@@ -255,6 +259,10 @@ func (c *codec) encodeFields(fd *bufio.Writer, ft []string) {
 
 // decodeFields 对结构体字段进行解码
 func (c *codec) decodeFields(fd *bufio.Writer, ft []string) {
+	fChar := ft[0][0]
+	if fChar < 'A' || fChar > 'Z' {
+		return
+	}
 	switch ft[1] {
 	default:
 		if strings.HasPrefix(ft[1], "map[") {
