@@ -1,9 +1,9 @@
-package resp
+package synchro
 
 import "github.com/micro/packet"
 
 // Decode RespSubs generate by codec.
-func (o *SyncSubs) Decode(p *packet.Packet) {
+func (o *Subs) Decode(p *packet.Packet) {
 	cExp := p.ReadU64()
 	o.Exp = make([]SubExp, cExp)
 	for i := uint64(0); i < cExp; i++ {
@@ -32,7 +32,7 @@ func (o *SyncSubs) Decode(p *packet.Packet) {
 }
 
 // Encode RespSubs generate by codec.
-func (o *SyncSubs) Encode(p *packet.Packet) {
+func (o *Subs) Encode(p *packet.Packet) {
 	cExp := uint64(len(o.Exp))
 	p.WriteU64(cExp)
 	for i := uint64(0); i < cExp; i++ {
@@ -60,7 +60,6 @@ func (o *SyncSubs) Encode(p *packet.Packet) {
 	}
 }
 
-
 // Decode SubExp generate by codec.
 func (o *SubExp) Decode(p *packet.Packet) {
 	o.Level = p.ReadI32()
@@ -76,7 +75,6 @@ func (o *SubExp) Encode(p *packet.Packet) {
 	p.WriteI32(o.Max)
 	p.WriteI32(o.Sub)
 }
-
 
 // Decode Role generate by codec.
 func (o *Role) Decode(p *packet.Packet) {
@@ -98,7 +96,6 @@ func (o *Role) Encode(p *packet.Packet) {
 	p.WriteI32S(o.Skl)
 }
 
-
 // Decode Equip generate by codec.
 func (o *Equip) Decode(p *packet.Packet) {
 	o.Id = p.ReadString()
@@ -119,7 +116,6 @@ func (o *Equip) Encode(p *packet.Packet) {
 	p.WriteI32S(o.Pis)
 }
 
-
 // Decode SubObject generate by codec.
 func (o *SubObject) Decode(p *packet.Packet) {
 	o.Id = p.ReadString()
@@ -134,7 +130,6 @@ func (o *SubObject) Encode(p *packet.Packet) {
 	p.WriteI32(o.Sub)
 }
 
-
 // Decode Task generate by codec.
 func (o *Task) Decode(p *packet.Packet) {
 	o.Id = p.ReadString()
@@ -146,4 +141,3 @@ func (o *Task) Encode(p *packet.Packet) {
 	p.WriteString(o.Id)
 	p.WriteI32(o.State)
 }
-

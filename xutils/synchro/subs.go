@@ -1,7 +1,7 @@
-package resp
+package synchro
 
 // SyncSubs 同步变更的数据
-type SyncSubs struct {
+type Subs struct {
 	Exp     []SubExp    `json:",omitempty"`
 	Roles   []Role      `json:",omitempty"`
 	Equips  []Equip     `json:",omitempty"`
@@ -11,12 +11,12 @@ type SyncSubs struct {
 }
 
 // DisableMerge 关闭合并功能
-func (o *SyncSubs) DisableMerge() {
+func (o *Subs) DisableMerge() {
 	o.dsm = true
 }
 
 // EnableMerge 开启合并功能
-func (o *SyncSubs) EnableMerge() {
+func (o *Subs) EnableMerge() {
 	o.dsm = false
 }
 
@@ -29,7 +29,7 @@ type SubExp struct {
 }
 
 // SyncExp 同步经验值
-func (o *SyncSubs) SyncExp(level, cur, max, sub int32) {
+func (o *Subs) SyncExp(level, cur, max, sub int32) {
 	if len(o.Exp) == 0 {
 		o.Exp = append(o.Exp, SubExp{
 			Level: level, Cur: cur, Max: max, Sub: sub,
@@ -53,7 +53,7 @@ type Role struct {
 }
 
 // SyncRole 同步角色
-func (o *SyncSubs) SyncRole(r *Role) {
+func (o *Subs) SyncRole(r *Role) {
 	for i := 0; i < len(o.Roles); i++ {
 		if o.Roles[i].Id == r.Id {
 			o.Roles[i].Rid = r.Rid
@@ -78,7 +78,7 @@ type Equip struct {
 }
 
 // SyncEquip 同步装备
-func (o *SyncSubs) SyncEquip(eq *Equip) {
+func (o *Subs) SyncEquip(eq *Equip) {
 	for i := 0; i < len(o.Equips); i++ {
 		if o.Equips[i].Id == eq.Id {
 			o.Equips[i].Eid = eq.Eid
@@ -100,7 +100,7 @@ type SubObject struct {
 }
 
 // SyncObject 同步物品
-func (o *SyncSubs) SyncObject(id string, num, sub int32) {
+func (o *Subs) SyncObject(id string, num, sub int32) {
 	if !o.dsm {
 		for i := 0; i < len(o.Objects); i++ {
 			if o.Objects[i].Id == id {
@@ -122,7 +122,7 @@ type Task struct {
 }
 
 // SyncTask 同步任务
-func (o *SyncSubs) SyncTask(id string, state int32) {
+func (o *Subs) SyncTask(id string, state int32) {
 	for i := 0; i < len(o.Tasks); i++ {
 		if o.Tasks[i].Id == id {
 			o.Tasks[i].State = state
