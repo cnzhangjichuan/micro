@@ -12,13 +12,25 @@ type SI32 struct {
 	i32 []int32
 }
 
+// 初始化
+func (mixed *SI32) Init(s string, i int32) {
+	if len(mixed.str) > 0 {
+		mixed.str = mixed.str[:1]
+		mixed.str[0] = s
+		mixed.i32 = mixed.i32[:1]
+		mixed.i32[0] = i;
+	} else {
+		mixed.Add(s, i)
+	}
+}
+
 // Add 添加数据
 func (mixed *SI32) Add(s string, i int32) {
 	mixed.str = append(mixed.str, s)
 	mixed.i32 = append(mixed.i32, i)
 }
 
-// Add 添加数据
+// Merge 添加数据
 func (mixed *SI32) Merge(s string, i int32) {
 	for x := 0; x < len(mixed.str); x++ {
 		if mixed.str[x] == s {

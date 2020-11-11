@@ -21,14 +21,15 @@ var env struct {
 		DBResource  string
 		UserTabName string
 		DBSQLs      []string
+		LogFlags    byte // lDebug/lLog/lError
 	}
 
 	// 校验码
 	authorize authorize
 
 	// 登入/登出
-	onLogin  lgOutterCaller
-	onLogout lgOutterCaller
+	onLogin  lgCaller
+	onLogout lgCaller
 
 	// 会话
 	cache packet.Cache
@@ -55,11 +56,13 @@ var env struct {
 	uploadFunc map[string]uploadFunc
 
 	// 日志
-	log *log.Logger
+	log      *log.Logger
+	logFlags byte
 }
 
 func init() {
 	// 处理日志
+	env.logFlags = lDebug | lLog | lError
 	SetLogger(os.Stderr)
 
 	// 业务接口
@@ -70,9 +73,15 @@ func init() {
 
 // loadConfig 加载配配置信息
 func loadConfig() error {
+	env.config.LogFlags = 255
 	pack := packet.New(1024)
 	err := pack.LoadConfig("./config.json", &env.config)
 	packet.Free(pack)
+
+	// 设置日志输出标志
+	if env.config.LogFlags != 255 {
+		env.logFlags = env.config.LogFlags
+	}
 
 	// 处理监听地址
 	if env.config.Address == "" {

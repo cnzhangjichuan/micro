@@ -233,6 +233,19 @@ func IndexStrings(arr []string, item string) int {
 	return -1
 }
 
+// EqualStrings 数组值是否相等
+func EqualStrings(s1, s2 []string) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for i, v := range s1 {
+		if s2[i] != v {
+			return false
+		}
+	}
+	return true
+}
+
 // HasU32 是否含有指定元素
 func HasU32(arr []uint32, item uint32) bool {
 	al := len(arr)

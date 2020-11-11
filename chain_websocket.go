@@ -4,26 +4,24 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/binary"
-	"errors"
 	"io"
 	"math"
 	"net"
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/micro/packet"
 	"github.com/micro/xutils"
-	"sync/atomic"
 )
 
-type lgOutterCaller func(dpo Dpo) error
+type lgCaller func(dpo Dpo)
 
 // SetLogin 设置登入回调
-func SetLogin(f lgOutterCaller) {
-	var callError = errors.New("login error")
-	env.onLogin = func(dpo Dpo) (err error) {
+func SetLogin(f lgCaller) {
+	env.onLogin = func(dpo Dpo) {
 		defer func() {
 			err := recover()
 			if err == nil {
@@ -34,17 +32,14 @@ func SetLogin(f lgOutterCaller) {
 			buf = buf[:runtime.Stack(buf, false)]
 			Debug("\n call login error: %v\n%s\n\n", err, buf)
 			packet.Free(pack)
-			err = callError
 		}()
-		err = f(dpo)
-		return
+		f(dpo)
 	}
 }
 
 // SetLogout 设置登出回调
-func SetLogout(f lgOutterCaller) {
-	var callError = errors.New("logout error")
-	env.onLogout = func(dpo Dpo) (err error) {
+func SetLogout(f lgCaller) {
+	env.onLogout = func(dpo Dpo) {
 		defer func() {
 			err := recover()
 			if err == nil {
@@ -55,10 +50,8 @@ func SetLogout(f lgOutterCaller) {
 			buf = buf[:runtime.Stack(buf, false)]
 			Debug("\n call logout error: %v\n%s\n\n", err, buf)
 			packet.Free(pack)
-			err = callError
 		}()
-		err = f(dpo)
-		return
+		f(dpo)
 	}
 }
 
@@ -136,12 +129,6 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 		return false
 	}
 
-	var (
-		wc                 = w.createWConn()
-		cac                = createDpoCache()
-		senderIndex uint32 = workerSize
-	)
-
 	// 获取远端地址
 	remote := pack.HTTPHeaderValue(httpRemoteAddress)
 	if remote == "" {
@@ -149,47 +136,30 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 	}
 
 	// 处理握手数据
-	uid, isCompress, err := w.handshake(conn, pack, func(protocols []string) (uid string, err error) {
-		if env.onLogin == nil {
-			return
-		}
+	uid, isCompress, err := w.handshake(conn, pack)
+	if err != nil || uid == "" {
+		return true
+	}
 
-		// 没有UID
-		if len(protocols) < 2 {
-			err = errWSInvalidToken
-			return
-		}
+	var (
+		wc                 = w.createWConn()
+		cac                = createDpoCache()
+		senderIndex uint32 = workerSize
+	)
 
-		// 校验身份
-		var ok bool
-		uid, ok = env.authorize.Check(strings.TrimSpace(protocols[1]))
-		if !ok {
-			err = errWSInvalidToken
-			return
-		}
-
+	// 将自身注册到会话中(初始化)
+	wc.uid = uid
+	wc.conn = conn
+	wc.isCompressed = isCompress
+	if w.RegisterConn(wc) && env.onLogin != nil {
 		// 调用登入
 		dpo := w.createDpo()
 		dpo.uid = uid
 		dpo.pack = pack
 		dpo.cache = cac
 		dpo.group = &wc.group
-		err = env.onLogin(dpo)
+		env.onLogin(dpo)
 		w.freeDpo(dpo)
-		return
-	})
-	if err != nil {
-		freeDpoCache(cac)
-		w.freeWConn(wc)
-		return true
-	}
-
-	// 将自身注册到会话中(初始化)
-	if uid != "" {
-		wc.uid = uid
-		wc.conn = conn
-		wc.isCompressed = isCompress
-		w.RegisterConn(wc)
 	}
 
 	// 处理数据
@@ -207,46 +177,29 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 		dpo.pack = pack
 		dpo.group = &wc.group
 		dpo.SetRemote(remote)
-
 		// 调用业务接口
-		if resp, _ := w.callAPI(conn, dpo, api); resp != nil {
+		if resp := w.callAPI(dpo, api); resp != nil {
 			w.encodingResponseData(dpo.pack, api, resp, isCompress)
 			ad := w.NewRespAutoData(dpo.pack.Copy())
 			senderIndex = w.AddRespConnData(conn, ad, senderIndex)
 			w.freeAutoData(ad)
 		}
-
-		// 将自身注册到会话中(切换账号)
-		if dpo.uid != "" && dpo.uid != uid {
-			uid = dpo.uid
-			if wc.uid != "" {
-				w.UnRegisterConn(wc)
-			}
-			wc.uid = uid
-			wc.conn = conn
-			wc.isCompressed = isCompress
-			w.RegisterConn(wc)
-		}
 		w.freeDpo(dpo)
 	}
 
 	// 登出
-	if env.onLogout != nil {
+	if w.UnRegisterConn(wc) && env.onLogout != nil {
 		dpo := w.createDpo()
 		dpo.uid = uid
 		dpo.cache = cac
 		dpo.pack = pack
 		dpo.SetRemote(remote)
-		err = env.onLogout(dpo)
-		if err != nil {
-			Debug("logout error %v", err)
-		}
+		env.onLogout(dpo)
 		w.freeDpo(dpo)
 	}
 
 	// 释放资源
 	freeDpoCache(cac)
-	w.UnRegisterConn(wc)
 	w.freeWConn(wc)
 
 	return true
@@ -262,36 +215,54 @@ func (w *websocket) Close() {
 }
 
 // callAPI 调用业务接口
-func (w *websocket) callAPI(conn net.Conn, dpo *wsDpo, api string) (interface{}, bool) {
+func (w *websocket) callAPI(dpo *wsDpo, api string) interface{} {
 	// 没有登录
 	if !env.authorize.CheckAPI(dpo.uid, api) {
-		return noLoginError, false
+		return noLoginError
 	}
 
 	// 没有发现业务接口
 	bis, ok := findBis(api)
 	if !ok {
-		return apiNotFoundError, false
+		return apiNotFoundError
 	}
 
 	resp, errCode := bis(dpo)
+	// 业务发生错误
 	if errCode != "" {
-		// 业务发生错误
-		return &errBisResp{ErrCode: errCode}, false
+		return &errBisResp{ErrCode: errCode}
 	}
-
 	// 返回业务数据
-	return resp, true
+	return resp
 }
 
 // handshake 处理握手
-func (w *websocket) handshake(conn net.Conn, pack *packet.Packet, onLogin func([]string) (string, error)) (uid string, isCompress bool, err error) {
+func (w *websocket) handshake(conn net.Conn, pack *packet.Packet) (uid string, isCompress bool, err error) {
 	protocols := strings.Split(pack.HTTPHeaderValue(wsProtocol), ",")
 	isCompress = strings.TrimSpace(protocols[0]) == "compress"
-	uid, err = onLogin(protocols)
-	if err != nil {
-		return
+	if env.onLogin != nil {
+		// 没有设置token
+		if len(protocols) < 2 {
+			err = errWSInvalidToken
+			return
+		}
+		// 校对Token值
+		var ok bool
+		uid, ok = env.authorize.CheckToken(strings.TrimSpace(protocols[1]))
+		if !ok {
+			err = errWSInvalidToken
+			return
+		}
+	} else {
+		if len(protocols) > 1 {
+			uid = strings.TrimSpace(protocols[1])
+		}
+		if uid == "" {
+			// 生成UID
+			uid = xutils.GUID(0)
+		}
 	}
+
 	secWK := pack.HTTPHeaderValue(wsKey)
 	rsh1 := sha1.Sum(xutils.UnsafeStringToBytes(secWK + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
 	secWK = base64.StdEncoding.EncodeToString(rsh1[:])
@@ -322,7 +293,7 @@ func (w *websocket) encodingResponseData(pack *packet.Packet, api string, v inte
 	size := pack.Size() - 10
 	prefix := pack.Slice(0, 10)
 
-	offset := int(0)
+	offset := 0
 	switch {
 	case size < 126:
 		offset = 8
@@ -532,41 +503,48 @@ func (w *websocket) AddRespConnData(conn net.Conn, ad *wkAutoData, idx uint32) u
 }
 
 // RegisterConn 注册到会话中
-func (w *websocket) RegisterConn(c *wConn) {
+func (w *websocket) RegisterConn(c *wConn) (isNewConn bool) {
 	if c == nil {
 		return
 	}
 	idx := xutils.HashCode32(c.uid) % chunkSize
 	w.session.chunks[idx].Lock()
-	if c1, ok := w.session.chunks[idx].m[c.uid]; ok && c1 != c {
-		c1.conn.Close()
+	if c1, ok := w.session.chunks[idx].m[c.uid]; ok {
+		if c1 != c {
+			c1.conn.Close()
+		}
+	} else {
+		isNewConn = true
 	}
 	w.session.chunks[idx].m[c.uid] = c
 	w.session.chunks[idx].Unlock()
+	return
 }
 
 // UnRegisterConn 从会话中注销
-func (w *websocket) UnRegisterConn(c *wConn) {
+func (w *websocket) UnRegisterConn(c *wConn) (isMine bool) {
 	if c == nil {
 		return
 	}
 	idx := xutils.HashCode32(c.uid) % chunkSize
 	w.session.chunks[idx].Lock()
 	if c1, ok := w.session.chunks[idx].m[c.uid]; ok && c1 == c {
+		isMine = true
 		delete(w.session.chunks[idx].m, c.uid)
 	}
 	w.session.chunks[idx].Unlock()
+	return
 }
 
 // SendData 发送数据
-func (w *websocket) SendData(v interface{}, api string, uids []string) {
+func (w *websocket) SendData(v interface{}, api string, uis []string) {
 	var gzd, nzd *wkAutoData
 
-	if len(uids) > 0 {
+	if len(uis) > 0 {
 		// 按用户发送
 		for i := 0; i < chunkSize; i++ {
 			w.session.chunks[i].RLock()
-			for _, uid := range uids {
+			for _, uid := range uis {
 				if m, ok := w.session.chunks[i].m[uid]; ok {
 					if m.isCompressed {
 						if gzd == nil {
