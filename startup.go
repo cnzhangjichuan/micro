@@ -86,7 +86,7 @@ func createService(onStartup func()) (net.Listener, error) {
 		userTableName = ""
 	}
 	userExpired := time.Duration(env.config.Expired) * time.Second
-	env.cache = packet.NewCache(userExpired, store.NewSaver(userTableName))
+	env.userCache = packet.NewCache(userExpired, store.NewSaver(userTableName))
 
 	// 调用外部初始化
 	if onStartup != nil {

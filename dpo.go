@@ -96,13 +96,13 @@ func (b *baseDpo) LoadUser(u packet.Identifier) bool {
 	if uid == "" {
 		return false
 	}
-	return env.cache.Load(u, uid)
+	return env.userCache.Load(u, uid)
 }
 
 // SetUser 设置用户数据
 func (b *baseDpo) SetUser(u packet.Identifier) {
 	b.uid = u.GetUID()
-	env.cache.Put(b.uid, u)
+	env.userCache.Put(b.uid, u)
 }
 
 // GetUID 角色ID

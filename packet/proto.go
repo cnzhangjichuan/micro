@@ -282,3 +282,16 @@ func (p *Packet) ReadBools() []bool {
 	}
 	return bs
 }
+
+// WriteBytes 写入[]byte
+func (p *Packet) WriteBytes(bs []byte) {
+	p.WriteU64(uint64(len(bs)))
+	p.Write(bs)
+}
+
+// ReadBytes 读出[]byte
+func (p *Packet) ReadBytes() []byte {
+	bs := make([]byte, p.ReadU64())
+	p.Read(bs)
+	return bs
+}

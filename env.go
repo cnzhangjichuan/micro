@@ -32,7 +32,7 @@ var env struct {
 	onLogout lgCaller
 
 	// 会话
-	cache packet.Cache
+	userCache packet.Cache
 
 	// 连接监听
 	lsr net.Listener
