@@ -11,6 +11,7 @@ type Rankings struct {
 	name  string
 	saver SingleSaver
 	items []rankingItem
+	edIns RankingItem
 }
 
 // Init 初始化
@@ -51,32 +52,6 @@ type rankingItem struct {
 	Data  []byte
 }
 
-// updateItem 更新榜中数据
-func (item *rankingItem) updateItem(src RankingItem) {
-	item.Id = src.GetID()
-	item.Value = src.GetValue()
-	pack := NewWithData(item.Data)
-	pack.Reset()
-	src.Encode(pack)
-	item.Data = pack.Data()
-	pack.buf = nil
-	Free(pack)
-}
-
-// 查找ID位置
-func (r *Rankings) findIndex(id string) int {
-	for i, j := 0, len(r.items)-1; i <= j; i, j = i+1, j-1 {
-		if r.items[i].Id == id {
-			return i
-		}
-		if r.items[j].Id == id {
-			return j
-		}
-	}
-	// 未上榜
-	return -1
-}
-
 // GetRank 查找ID对应的排名
 func (r *Rankings) GetRank(id string) int32 {
 	r.RLock()
@@ -90,7 +65,7 @@ func (r *Rankings) GetRank(id string) int32 {
 }
 
 // LoadRankings 加载榜单
-func (r *Rankings) LoadRankings(creator func(i int) RankingItem, offset, count int, id string) (n int) {
+func (r *Rankings) LoadRankings(creator func(int) RankingItem, offset, count int, id string) (n int) {
 	e := offset + count
 	if e > len(r.items) {
 		e = len(r.items)
@@ -105,39 +80,22 @@ func (r *Rankings) LoadRankings(creator func(i int) RankingItem, offset, count i
 	if id != "" {
 		idIdx = r.findIndex(id)
 		if idIdx >= offset && idIdx < e {
-			// 在查找范围内
 			idIdx = -1
 		} else if idIdx != -1 {
-			// 不在查找范围内
 			e = -1
 		}
 	}
 	if idIdx != -1 && idIdx < offset {
-		pack.buf = r.items[idIdx].Data
-		pack.r, pack.w = 0, len(pack.buf)
-		item := creator(n)
-		n += 1
-		item.Decode(pack)
-		item.SetRank(r.items[idIdx].Rank)
+		n = r.setRankingItem(pack, creator, idIdx, n)
 	}
 	for i := offset; i < e; i++ {
 		if r.items[i].Id == "" {
 			break
 		}
-		pack.buf = r.items[i].Data
-		pack.r, pack.w = 0, len(pack.buf)
-		item := creator(n)
-		n += 1
-		item.Decode(pack)
-		item.SetRank(r.items[i].Rank)
+		n = r.setRankingItem(pack, creator, i, n)
 	}
 	if idIdx >= e {
-		pack.buf = r.items[idIdx].Data
-		pack.r, pack.w = 0, len(pack.buf)
-		item := creator(n)
-		n += 1
-		item.Decode(pack)
-		item.SetRank(r.items[idIdx].Rank)
+		n = r.setRankingItem(pack, creator, idIdx, n)
 	}
 	r.RUnlock()
 	pack.buf = nil
@@ -146,51 +104,22 @@ func (r *Rankings) LoadRankings(creator func(i int) RankingItem, offset, count i
 }
 
 // LoadNears 加载与自身相邻的榜单数据
-func (r *Rankings) LoadNears(creator func(i int) RankingItem, id string, window []int, top3 bool) int {
-	var (
-		max  = len(r.items) - 1
-		s    int
-		last = window[len(window)-1]
-		n    = 0
-	)
+func (r *Rankings) LoadNears(creator func(i int) RankingItem, id string, window []int, top3 bool) (n int) {
 	r.RLock()
-	i := r.findIndex(id)
+	cdx := r.findIndex(id)
 	r.RUnlock()
-	if i == -1 {
-		// 自身没有入榜
-		s = max - last
-	} else {
-		// 自身已入榜
-		s = i - window[len(window)/2]
-		if s < 3 {
-			s = 3
-		} else if s+last > max {
-			s = max - last
-		}
-	}
+
 	pack := packetPool.Get().(*Packet)
 	pack.freed = 0
+
+	// 装载数据
+	ids := r.calNearCoordinate(window, cdx, top3)
 	r.RLock()
-	if top3 {
-		for i := 0; i < 3; i++ {
-			pack.buf = r.items[i].Data
-			pack.r, pack.w = 0, len(pack.buf)
-			item := creator(n)
-			n += 1
-			item.Decode(pack)
-			item.SetRank(r.items[i].Rank)
-		}
-	}
-	for i := 0; i < len(window); i++ {
-		idx := window[i] + s
-		pack.buf = r.items[idx].Data
-		pack.r, pack.w = 0, len(pack.buf)
-		item := creator(n)
-		n += 1
-		item.Decode(pack)
-		item.SetRank(r.items[idx].Rank)
+	for _, i := range ids {
+		n = r.setRankingItem(pack, creator, i, n)
 	}
 	r.RUnlock()
+
 	pack.buf = nil
 	Free(pack)
 	return n
@@ -221,7 +150,7 @@ func (r *Rankings) Add(item RankingItem) (rank, delta int32) {
 			break
 		}
 		if rid == id {
-			r.items[i].updateItem(item)
+			r.updateItem(i, item)
 			idx, oRank = i, r.items[i].Rank
 			break
 		}
@@ -241,7 +170,7 @@ func (r *Rankings) Add(item RankingItem) (rank, delta int32) {
 
 	// 更新数据
 	rank = oRank
-	r.items[idx].updateItem(item)
+	r.updateItem(idx, item)
 
 	if idx > 0 && r.items[idx].Value > r.items[idx-1].Value {
 		// 如果比上一个数据大，提升排名
@@ -332,4 +261,84 @@ func (r *Rankings) loadData() {
 	r.Unlock()
 	pack.buf = nil
 	Free(pack)
+}
+
+// 查找ID位置
+func (r *Rankings) findIndex(id string) int {
+	for i, j := 0, len(r.items)-1; i <= j; i, j = i+1, j-1 {
+		if r.items[i].Id == id {
+			return i
+		}
+		if r.items[j].Id == id {
+			return j
+		}
+	}
+	// 未上榜
+	return -1
+}
+
+// updateItem 更新榜中数据
+func (r *Rankings) updateItem(i int, src RankingItem) {
+	r.items[i].Id = src.GetID()
+	r.items[i].Value = src.GetValue()
+	pack := NewWithData(r.items[i].Data)
+	pack.Reset()
+	src.Encode(pack)
+	r.items[i].Data = pack.Data()
+	pack.buf = nil
+	Free(pack)
+}
+
+// setRankingItem 填充数据
+func (r *Rankings) setRankingItem(pack *Packet, creator func(int) RankingItem, i, n int) int {
+	pack.buf = r.items[i].Data
+	pack.r, pack.w = 0, len(pack.buf)
+	item := creator(n)
+	item.Decode(pack)
+	item.SetRank(r.items[i].Rank)
+	return n + 1
+}
+
+// calNearCoordinate 计算邻近的下标列表
+func (r *Rankings) calNearCoordinate(window []int, cdx int, top3 bool) []int {
+	coordinates := make([]int, 0, len(window)+4)
+
+	// 加入top3
+	if top3 {
+		coordinates = append(coordinates, 0, 1, 2)
+	}
+
+	rMax := len(r.items) - 1
+	wMax := window[len(window)-1]
+
+	// 未入榜
+	if cdx == -1 {
+		s := rMax - wMax
+		for _, i := range window {
+			coordinates = append(coordinates, i+s)
+		}
+		return coordinates
+	}
+
+	// 计算榜中位置
+	ofx := cdx + window[0] - 3
+	s := cdx
+	if ofx < 0 {
+		s -= ofx
+	}
+	ofx = cdx + wMax - rMax
+	if ofx > 0 {
+		s -= ofx
+	}
+	for _, i := range window {
+		ofx = i + s
+		if cdx == ofx {
+			cdx = -1
+		} else if cdx != -1 && cdx < ofx {
+			coordinates = append(coordinates, cdx)
+			cdx = -1
+		}
+		coordinates = append(coordinates, ofx)
+	}
+	return coordinates
 }
