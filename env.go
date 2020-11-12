@@ -52,6 +52,9 @@ var env struct {
 	// 重载函数
 	reloadFunc []func()
 
+	// 服务器关闭之前执行的函数
+	closeFunc []func()
+
 	// 文件上传
 	uploadFunc map[string]uploadFunc
 

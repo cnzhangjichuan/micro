@@ -41,6 +41,15 @@ type Saver interface {
 	Load(data interface{}, id string) bool
 }
 
+// SingleSaver 单表数据加载器
+type SingleSaver interface {
+	// Save 将数据保存到指定的数据表中
+	Save(id string, data []byte) (ok bool)
+
+	// Find 从数据表中查询数据
+	Find(id string) (data []byte, ok bool)
+}
+
 type cache struct {
 	cks []chunk
 	cze uint32

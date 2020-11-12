@@ -1,13 +1,14 @@
 package store
 
 import (
+	"encoding/hex"
 	"strconv"
 	"strings"
 
 	"github.com/micro/packet"
 )
 
-// NewSaver 创建回载器
+// NewSaver 创建加载器
 func NewSaver(name string) *saver {
 	if name == "" {
 		return nil
@@ -91,4 +92,79 @@ func (s *saver) Load(data interface{}, id string) bool {
 	packet.Free(pack)
 
 	return err == nil
+}
+
+// NewSingleSaver 创建单表加载器
+func NewSingleSaver(name string) *singleSaver {
+	if name == "" {
+		return nil
+	}
+
+	// 创建数据表
+	env.db.Exec(strings.Join([]string{
+		`create table `, name,
+		`(id varchar(20) unique,value text)`,
+	}, ""))
+
+	return &singleSaver{
+		insert: strings.Join([]string{
+			`insert into `, name,
+			` values($1,$2)`,
+			` on conflict(id) do update set value=$3`,
+		}, ""),
+		query: strings.Join([]string{
+			`select value from `, name, ` where id=$1`,
+		}, ""),
+	}
+}
+
+type singleSaver struct {
+	insert string
+	query  string
+}
+
+// Save 保存数据
+func (s *singleSaver) Save(id string, data []byte) (ok bool) {
+	if s == nil {
+		return
+	}
+	env.RLock()
+	if env.db == nil {
+		env.RUnlock()
+		return
+	}
+
+	v := hex.EncodeToString(data)
+	_, err := env.db.Exec(s.insert, id, v, v)
+	env.RUnlock()
+	if err != nil {
+		if env.backupOnError != nil {
+			env.backupOnError(s.insert, err)
+		}
+	} else {
+		ok = true
+	}
+	return
+}
+
+// Find 从表数据库中查询数据
+func (s *singleSaver) Find(id string) (data []byte, ok bool) {
+	if s == nil {
+		return
+	}
+	env.RLock()
+	if env.db == nil {
+		env.RUnlock()
+		return
+	}
+	r := env.db.QueryRow(s.query, id)
+	env.RUnlock()
+
+	err := r.Scan(&data)
+	ok = err == nil
+	if ok {
+		n, _ := hex.Decode(data, data)
+		data = data[:n]
+	}
+	return
 }

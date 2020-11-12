@@ -3,6 +3,7 @@ package micro
 import (
 	"errors"
 	"net"
+	"runtime"
 	"time"
 
 	"github.com/micro/packet"
@@ -33,6 +34,23 @@ func (c *closer) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 	pack.FlushToConn(conn)
 
 	return true
+}
+
+// RegisterReloadFunc 注册服务器关闭接口
+func RegisterCloseFunc(f func()) {
+	env.closeFunc = append(env.closeFunc, func() {
+		defer func() {
+			err := recover()
+			if err == nil {
+				return
+			}
+			pack := packet.New(1024)
+			buf := pack.Allocate(1024)
+			buf = buf[:runtime.Stack(buf, false)]
+			Debug("\nclose error: %v\n%s\n\n", err, buf)
+		}()
+		f()
+	})
 }
 
 // 请求关闭服务

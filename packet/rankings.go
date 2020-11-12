@@ -9,17 +9,11 @@ type Rankings struct {
 	sync.RWMutex
 
 	name  string
-	saver Saver
+	saver SingleSaver
 	items []rankingItem
 }
 
-type rankingItem struct {
-	Id    string
-	Rank  int32
-	Value int32
-	Data  []byte
-}
-
+// RankingItem 数据结果
 type RankingItem interface {
 	Encoder
 	Decoder
@@ -29,17 +23,35 @@ type RankingItem interface {
 	SetRank(int32)
 }
 
+// rankingItem 排名序列内部结构
+type rankingItem struct {
+	Id    string
+	Rank  int32
+	Value int32
+	Data  []byte
+}
+
+// updateItem 更新榜中数据
+func (item *rankingItem) updateItem(src RankingItem) {
+	item.Id = src.GetID()
+	item.Value = src.GetValue()
+	pack := NewWithData(item.Data)
+	pack.Reset()
+	src.Encode(pack)
+	item.Data = pack.Data()
+	pack.buf = nil
+	Free(pack)
+}
+
 // Init 初始化
-func (r *Rankings) Init(name string, capacity int, saver Saver) {
+func (r *Rankings) Init(name string, capacity int, saver SingleSaver) {
 	r.name = name
 	r.items = make([]rankingItem, capacity)
 	for i := 0; i < capacity; i++ {
 		r.items[i].Rank = int32(i + 1)
 	}
 	r.saver = saver
-	if saver != nil {
-		saver.Load(r, name)
-	}
+	r.loadData()
 }
 
 // LoadRankings 加载榜单
@@ -71,30 +83,28 @@ func (r *Rankings) LoadRankings(creator func(i int) RankingItem, s, count int) i
 // Add 添加数据
 func (r *Rankings) Add(item RankingItem) (rank, delta int32) {
 	var (
-		idx   int = -1
+		idx   = -1
 		rid   string
 		oRank int32
 		id    = item.GetID()
-		value = item.GetValue()
 	)
 
-	r.Lock()
-
-	// 比榜尾还要小, 不更新数据
-	if value <= r.items[len(r.items)-1].Value {
-		r.Unlock()
-		return
+	// 没有设置ID
+	if id == "" {
+		return -1, -1
 	}
+
+	r.Lock()
 
 	// 如果在榜中, 直接更新榜中数据
 	for i := 0; i < len(r.items); i++ {
 		rid = r.items[i].Id
-		if rid == "" || rid == id {
-			// value没有榜中的大
-			if value <= r.items[i].Value {
-				r.Unlock()
-				return
-			}
+		if rid == "" {
+			idx, oRank = i, r.items[i].Rank
+			break
+		}
+		if rid == id {
+			r.items[i].updateItem(item)
 			idx, oRank = i, r.items[i].Rank
 			break
 		}
@@ -106,27 +116,30 @@ func (r *Rankings) Add(item RankingItem) (rank, delta int32) {
 		oRank = r.items[idx].Rank
 	}
 
-	// 在指定位置更新数据
+	// 更新数据
 	rank = oRank
-	r.items[idx].Id = id
-	r.items[idx].Value = value
-	pack := NewWithData(r.items[idx].Data)
-	pack.Reset()
-	item.Encode(pack)
-	r.items[idx].Data = pack.Data()
-	pack.buf = nil
-	Free(pack)
+	r.items[idx].updateItem(item)
 
-	// 将数据移动到相应的榜位上
-	for i := idx - 1; i >= 0; i-- {
-		idx = i + 1
-		if r.items[idx].Value <= r.items[i].Value {
-			break
+	if idx > 0 && r.items[idx].Value > r.items[idx-1].Value {
+		// 如果比上一个数据大，提升排名
+		for provIdx := idx - 1; provIdx >= 0; provIdx-- {
+			idx = provIdx + 1
+			if r.items[idx].Value <= r.items[provIdx].Value {
+				break
+			}
+			rank = r.items[provIdx].Rank
+			r.swap(idx, provIdx)
 		}
-		rank = r.items[i].Rank
-		r.items[idx].Id, r.items[i].Id = r.items[i].Id, r.items[idx].Id
-		r.items[idx].Value, r.items[i].Value = r.items[i].Value, r.items[idx].Value
-		r.items[idx].Data, r.items[i].Data = r.items[i].Data, r.items[idx].Data
+	} else if idx < len(r.items)-1 && r.items[idx].Value < r.items[idx+1].Value {
+		// 如果比下一个数据小，下降排名
+		for nextIdx := idx + 1; nextIdx < len(r.items); nextIdx++ {
+			idx = nextIdx - 1
+			if r.items[idx].Value >= r.items[nextIdx].Value {
+				break
+			}
+			rank = r.items[nextIdx].Rank
+			r.swap(idx, nextIdx)
+		}
 	}
 
 	r.Unlock()
@@ -134,17 +147,24 @@ func (r *Rankings) Add(item RankingItem) (rank, delta int32) {
 	return
 }
 
-// Save 将数据保存到磁盘上
-func (r *Rankings) Save() {
-	if r.saver != nil {
-		r.RLock()
-		r.saver.Save(r, r.name)
-		r.RUnlock()
-	}
+// swap 交换数据
+func (r *Rankings) swap(i, j int) {
+	r.items[j].Id, r.items[i].Id = r.items[i].Id, r.items[j].Id
+	r.items[j].Value, r.items[i].Value = r.items[i].Value, r.items[j].Value
+	r.items[j].Data, r.items[i].Data = r.items[i].Data, r.items[j].Data
 }
 
-// Encode 序列化Rankings
-func (r *Rankings) Encode(pack *Packet) {
+// Close 将数据保存到磁盘上
+// 一般在服务器关之前调用，保存到数据库中
+func (r *Rankings) Close() {
+	const initCacheSize = 4096
+
+	if r.saver == nil {
+		return
+	}
+
+	pack := New(initCacheSize)
+	r.RLock()
 	for i := 0; i < len(r.items); i++ {
 		if r.items[i].Id == "" {
 			break
@@ -153,10 +173,24 @@ func (r *Rankings) Encode(pack *Packet) {
 		pack.WriteI32(r.items[i].Value)
 		pack.WriteBytes(r.items[i].Data)
 	}
+	r.RUnlock()
+	pack.Compress(0)
+	r.saver.Save(r.name, pack.Data())
+	Free(pack)
 }
 
-// Decode 从流中解析数据
-func (r *Rankings) Decode(pack *Packet) {
+// loadData 从数据库中初始化数据
+func (r *Rankings) loadData() {
+	if r.saver == nil {
+		return
+	}
+	data, ok := r.saver.Find(r.name)
+	if !ok || len(data) == 0 {
+		return
+	}
+	pack := NewWithData(data)
+	pack.UnCompress(0)
+	r.Lock()
 	for i := 0; i < len(r.items); i++ {
 		r.items[i].Id = pack.ReadString()
 		if r.items[i].Id == "" {
@@ -165,4 +199,7 @@ func (r *Rankings) Decode(pack *Packet) {
 		r.items[i].Value = pack.ReadI32()
 		r.items[i].Data = pack.ReadBytes()
 	}
+	r.Unlock()
+	pack.buf = nil
+	Free(pack)
 }

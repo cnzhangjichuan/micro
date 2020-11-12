@@ -114,6 +114,9 @@ func createService(onStartup func()) (net.Listener, error) {
 // destroyService 销毁服务
 func destroyService() {
 	env.lsr.Close()
+	for _, closeFunc := range env.closeFunc {
+		closeFunc()
+	}
 	for i := 0; i < len(env.chains); i++ {
 		env.chains[i].Close()
 	}
