@@ -70,25 +70,18 @@ func (s *saver) Load(data interface{}, id string) bool {
 		return false
 	}
 	suffix := tableSuffix(id)
-	r, err := env.db.Query(strings.Join([]string{
+	r := env.db.QueryRow(strings.Join([]string{
 		`select value from `, s.name, suffix, ` where id='`, Ignore(id), `'`,
 	}, ""))
 	env.RUnlock()
 
-	if err != nil {
-		return false
-	}
-	if !r.Next() {
-		r.Close()
-		return false
-	}
-
 	var buf []byte
-	r.Scan(&buf)
-	r.Close()
+	if err := r.Scan(&buf); err != nil {
+		return false
+	}
 
 	pack := packet.NewWithData(buf)
-	err = pack.DecodeJSON(data)
+	err := pack.DecodeJSON(data)
 	packet.Free(pack)
 
 	return err == nil
