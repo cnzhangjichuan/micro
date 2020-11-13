@@ -15,9 +15,10 @@ type Rankings struct {
 }
 
 // Init 初始化
-func (r *Rankings) Init(name string, capacity int, saver SingleSaver) {
+func (r *Rankings) Init(name string, capacity int, edIns RankingItem, saver SingleSaver) {
 	r.name = name
 	r.items = make([]rankingItem, capacity)
+	r.edIns = edIns
 	for i := 0; i < capacity; i++ {
 		r.items[i].Rank = int32(i + 1)
 	}
@@ -82,16 +83,13 @@ func (r *Rankings) LoadRankings(creator func(int) RankingItem, offset, count int
 		if idIdx >= offset && idIdx < e {
 			idIdx = -1
 		} else if idIdx != -1 {
-			e = -1
+			e -= 1
 		}
 	}
 	if idIdx != -1 && idIdx < offset {
 		n = r.setRankingItem(pack, creator, idIdx, n)
 	}
 	for i := offset; i < e; i++ {
-		if r.items[i].Id == "" {
-			break
-		}
 		n = r.setRankingItem(pack, creator, i, n)
 	}
 	if idIdx >= e {
@@ -125,8 +123,8 @@ func (r *Rankings) LoadNears(creator func(i int) RankingItem, id string, window 
 	return n
 }
 
-// Add 添加数据
-func (r *Rankings) Add(item RankingItem) (rank, delta int32) {
+// Update 更新数据
+func (r *Rankings) Update(item RankingItem) (rank, delta int32) {
 	var (
 		idx   = -1
 		rid   string
@@ -147,11 +145,17 @@ func (r *Rankings) Add(item RankingItem) (rank, delta int32) {
 		rid = r.items[i].Id
 		if rid == "" {
 			idx, oRank = i, r.items[i].Rank
+			rank = oRank
 			break
 		}
 		if rid == id {
-			r.updateItem(i, item)
 			idx, oRank = i, r.items[i].Rank
+			rank = oRank
+			if r.items[i].Value == item.GetValue() {
+				r.updateItem(i, item)
+				delta = 0
+				return
+			}
 			break
 		}
 	}
@@ -165,11 +169,11 @@ func (r *Rankings) Add(item RankingItem) (rank, delta int32) {
 			return
 		}
 		idx = len(r.items) - 1
-		oRank = r.items[idx].Rank
+		oRank = r.getOutRankingsRank(item.GetValue())
+		rank = oRank
 	}
 
 	// 更新数据
-	rank = oRank
 	r.updateItem(idx, item)
 
 	if idx > 0 && r.items[idx].Value > r.items[idx-1].Value {
@@ -199,12 +203,41 @@ func (r *Rankings) Add(item RankingItem) (rank, delta int32) {
 	return
 }
 
-// Swap 交换数据
-//func (r *Rankings) Swap(i, j int) {
-//	r.Lock()
-//	r.swap(i, j)
-//	r.Unlock()
-//}
+// Replace 将指定位置的数据替换掉
+func (r *Rankings) Replace(mine RankingItem, dest string) (rank, delta int32) {
+	r.Lock()
+	destIdx := r.findIndex(dest)
+	if destIdx == -1 {
+		r.Unlock()
+		rank, delta = -1, 0
+		return
+	}
+	rank = r.items[destIdx].Rank
+	mineIdx := r.findIndex(mine.GetID())
+	oRank := rank
+	if mineIdx >= 0 {
+		r.swap(destIdx, mineIdx)
+		oRank = r.items[mineIdx].Rank
+	} else {
+		oRank = r.getOutRankingsRank(mine.GetValue())
+	}
+	r.updateItem(destIdx, mine)
+	r.Unlock()
+	delta = oRank - rank
+	return
+}
+
+// getOutRankingsRank 获取排行榜之外的排名
+func (r *Rankings) getOutRankingsRank(value int32) (rank int32) {
+	rank = int32(len(r.items))
+	offset := value - r.items[rank-1].Value
+	if offset > 0 {
+		rank += offset
+	} else {
+		rank -= offset
+	}
+	return
+}
 
 // swap 交换数据
 func (r *Rankings) swap(i, j int) {
@@ -223,6 +256,8 @@ func (r *Rankings) Close() {
 	}
 
 	pack := New(initCacheSize)
+	encoder := packetPool.Get().(*Packet)
+	encoder.freed = 0
 	r.RLock()
 	for i := 0; i < len(r.items); i++ {
 		if r.items[i].Id == "" {
@@ -230,11 +265,18 @@ func (r *Rankings) Close() {
 		}
 		pack.WriteString(r.items[i].Id)
 		pack.WriteI32(r.items[i].Value)
-		pack.WriteBytes(r.items[i].Data)
+		encoder.buf = r.items[i].Data
+		encoder.r, encoder.w = 0, len(encoder.buf)
+		r.edIns.Decode(encoder)
+		encoder.Reset()
+		encoder.EncodeJSON(r.edIns, false, false)
+		pack.WriteBytes(encoder.Data())
 	}
 	r.RUnlock()
 	pack.Compress(0)
 	r.saver.Save(r.name, pack.Data())
+	encoder.buf = nil
+	Free(encoder)
 	Free(pack)
 }
 
@@ -249,6 +291,8 @@ func (r *Rankings) loadData() {
 	}
 	pack := NewWithData(data)
 	pack.UnCompress(0)
+	decoder := packetPool.Get().(*Packet)
+	decoder.freed = 0
 	r.Lock()
 	for i := 0; i < len(r.items); i++ {
 		r.items[i].Id = pack.ReadString()
@@ -256,9 +300,16 @@ func (r *Rankings) loadData() {
 			break
 		}
 		r.items[i].Value = pack.ReadI32()
-		r.items[i].Data = pack.ReadBytes()
+		decoder.buf = pack.ReadBytes()
+		decoder.r, decoder.w = 0, len(decoder.buf)
+		decoder.DecodeJSON(r.edIns)
+		decoder.Reset()
+		r.edIns.Encode(decoder)
+		r.items[i].Data = decoder.Data()
 	}
 	r.Unlock()
+	decoder.buf = nil
+	Free(decoder)
 	pack.buf = nil
 	Free(pack)
 }
@@ -291,6 +342,9 @@ func (r *Rankings) updateItem(i int, src RankingItem) {
 
 // setRankingItem 填充数据
 func (r *Rankings) setRankingItem(pack *Packet, creator func(int) RankingItem, i, n int) int {
+	if r.items[i].Id == "" {
+		return n
+	}
 	pack.buf = r.items[i].Data
 	pack.r, pack.w = 0, len(pack.buf)
 	item := creator(n)
@@ -329,6 +383,9 @@ func (r *Rankings) calNearCoordinate(window []int, cdx int, top3 bool) []int {
 	ofx = cdx + wMax - rMax
 	if ofx > 0 {
 		s -= ofx
+	}
+	if top3 && cdx < 3 {
+		cdx = -1
 	}
 	for _, i := range window {
 		ofx = i + s
