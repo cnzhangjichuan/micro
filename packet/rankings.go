@@ -153,6 +153,7 @@ func (r *Rankings) Update(item RankingItem) (rank, delta int32) {
 			rank = oRank
 			if r.items[i].Value == item.GetValue() {
 				r.updateItem(i, item)
+				r.Unlock()
 				delta = 0
 				return
 			}
