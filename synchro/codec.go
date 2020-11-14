@@ -2,8 +2,8 @@ package synchro
 
 import "github.com/micro/packet"
 
-// Decode Subs generate by codec.
-func (o *Subs) Decode(p *packet.Packet) {
+// Decode Universal generate by codec.
+func (o *Universal) Decode(p *packet.Packet) {
 	cExp := p.ReadU64()
 	o.Exp = make([]SubExp, cExp)
 	for i := uint64(0); i < cExp; i++ {
@@ -31,8 +31,8 @@ func (o *Subs) Decode(p *packet.Packet) {
 	}
 }
 
-// Encode Subs generate by codec.
-func (o *Subs) Encode(p *packet.Packet) {
+// Encode Universal generate by codec.
+func (o *Universal) Encode(p *packet.Packet) {
 	cExp := uint64(len(o.Exp))
 	p.WriteU64(cExp)
 	for i := uint64(0); i < cExp; i++ {
