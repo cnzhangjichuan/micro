@@ -74,6 +74,34 @@ func (mixed *SI32) Parse(s string) {
 	}
 }
 
+// AppendParse 解析数据
+func (mixed *SI32) AppendParse(s string) {
+	const def = 0
+
+	if s == "" {
+		return
+	}
+
+	if strings.Index(s, ";") >= 0 {
+		items := strings.Split(s, ";")
+		for _, v := range items {
+			in := strings.Split(v, ",")
+			mixed.str = append(mixed.str, in[0])
+			if len(in) > 1 {
+				mixed.i32 = append(mixed.i32, xutils.ParseI32(in[1], def))
+			} else {
+				mixed.i32 = append(mixed.i32, def)
+			}
+		}
+	} else {
+		items := strings.Split(s, ",")
+		for i := 1; i < len(items); i += 2 {
+			mixed.str = append(mixed.str, items[i-1])
+			mixed.i32 = append(mixed.i32, xutils.ParseI32(items[i], def))
+		}
+	}
+}
+
 // Len 获取数据长度
 func (mixed *SI32) Len() int {
 	return len(mixed.str)
