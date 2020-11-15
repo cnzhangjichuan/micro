@@ -3,12 +3,30 @@ package xutils
 import (
 	"math/rand"
 	"sync"
+	"sync/atomic"
 )
 
 var aliasMethodsPool = sync.Pool{
 	New: func() interface{} {
 		return &AliasMethods{}
 	},
+}
+
+// NewAliasMethods 获取采样表
+func NewAliasMethods() *AliasMethods {
+	a := aliasMethodsPool.Get().(*AliasMethods)
+	a.freed = 0
+	return a
+}
+
+// FreeAliasMethods 返回采样表
+func FreeAliasMethods(a *AliasMethods) {
+	if a == nil {
+		return
+	}
+	if atomic.CompareAndSwapInt32(&a.freed, 0, 1) {
+		aliasMethodsPool.Put(a)
+	}
 }
 
 // RandIndexWithProb 通过概率获取随机索引
@@ -48,6 +66,7 @@ func RandIndexWithWeight(weight []int32) int {
 
 // AliasMethods 别名采样
 type AliasMethods struct {
+	freed int32
 	prob  []float32
 	alias []int
 	sms   []int

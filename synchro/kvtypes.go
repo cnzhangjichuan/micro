@@ -1,9 +1,8 @@
 package synchro
 
 import (
+	"strconv"
 	"strings"
-
-	"github.com/micro/xutils"
 )
 
 // SI32 string/int32值对
@@ -43,6 +42,8 @@ func (mixed *SI32) Merge(s string, i int32) {
 
 // Parse 解析数据
 func (mixed *SI32) Parse(s string) {
+	const def = 1
+
 	if s == "" {
 		mixed.str = make([]string, 0)
 		mixed.i32 = make([]int32, 0)
@@ -56,48 +57,81 @@ func (mixed *SI32) Parse(s string) {
 		for x, v := range items {
 			in := strings.Split(v, ",")
 			mixed.str[x] = in[0]
-			if len(in) > 1 {
-				mixed.i32[x] = xutils.ParseI32(in[1], 0)
+			if len(in) < 2 {
+				mixed.i32 = append(mixed.i32, def)
+				continue
+			}
+			v, err := strconv.ParseInt(in[1], 10, 32)
+			if err != nil {
+				mixed.i32 = append(mixed.i32, def)
 			} else {
-				mixed.i32[x] = 0
+				mixed.i32 = append(mixed.i32, int32(v))
 			}
 		}
 	} else {
 		items := strings.Split(s, ",")
-		l := len(items) / 2
+		l := len(items)
 		mixed.str = make([]string, 0, l)
 		mixed.i32 = make([]int32, 0, l)
-		for i := 1; i < len(items); i += 2 {
-			mixed.str = append(mixed.str, items[i-1])
-			mixed.i32 = append(mixed.i32, xutils.ParseI32(items[i], 0))
+		i := 0
+		for i < l {
+			mixed.str = append(mixed.str, items[i])
+			i += 1
+			if i >= l {
+				mixed.i32 = append(mixed.i32, def)
+				break
+			}
+			v, err := strconv.ParseInt(items[i], 10, 32)
+			if err != nil {
+				mixed.i32 = append(mixed.i32, def)
+				continue
+			}
+			i += 1
+			mixed.i32 = append(mixed.i32, int32(v))
 		}
 	}
 }
 
-// AppendParse 解析数据
-func (mixed *SI32) AppendParse(s string) {
-	const def = 0
+// Append 解析数据
+func (mixed *SI32) Append(s string) {
+	const def = 1
 
 	if s == "" {
 		return
 	}
-
 	if strings.Index(s, ";") >= 0 {
 		items := strings.Split(s, ";")
 		for _, v := range items {
 			in := strings.Split(v, ",")
 			mixed.str = append(mixed.str, in[0])
-			if len(in) > 1 {
-				mixed.i32 = append(mixed.i32, xutils.ParseI32(in[1], def))
-			} else {
+			if len(in) < 2 {
 				mixed.i32 = append(mixed.i32, def)
+				continue
+			}
+			v, err := strconv.ParseInt(in[1], 10, 32)
+			if err != nil {
+				mixed.i32 = append(mixed.i32, def)
+			} else {
+				mixed.i32 = append(mixed.i32, int32(v))
 			}
 		}
 	} else {
 		items := strings.Split(s, ",")
-		for i := 1; i < len(items); i += 2 {
-			mixed.str = append(mixed.str, items[i-1])
-			mixed.i32 = append(mixed.i32, xutils.ParseI32(items[i], def))
+		i := 0
+		for i < len(items) {
+			mixed.str = append(mixed.str, items[i])
+			i += 1
+			if i >= len(items) {
+				mixed.i32 = append(mixed.i32, def)
+				break
+			}
+			v, err := strconv.ParseInt(items[i], 10, 32)
+			if err != nil {
+				mixed.i32 = append(mixed.i32, def)
+				continue
+			}
+			i += 1
+			mixed.i32 = append(mixed.i32, int32(v))
 		}
 	}
 }
@@ -159,20 +193,36 @@ func (mixed *SF32) Parse(s string) {
 		for x, v := range items {
 			in := strings.Split(v, ",")
 			mixed.str[x] = in[0]
-			if len(in) > 1 {
-				mixed.f32[x] = xutils.ParseF32(in[1], 0)
-			} else {
+			if len(in) < 2 {
 				mixed.f32[x] = 0
+				continue
+			}
+			if v, err := strconv.ParseFloat(in[1], 32); err != nil {
+				mixed.f32[x] = 0
+			} else {
+				mixed.f32[x] = float32(v)
 			}
 		}
 	} else {
 		items := strings.Split(s, ",")
-		l := len(items) / 2
+		l := len(items)
 		mixed.str = make([]string, 0, l)
 		mixed.f32 = make([]float32, 0, l)
-		for i := 1; i < len(items); i += 2 {
-			mixed.str = append(mixed.str, items[i-1])
-			mixed.f32 = append(mixed.f32, xutils.ParseF32(items[i], 0))
+		i := 0
+		for i < l {
+			mixed.str = append(mixed.str, items[i])
+			i += 1
+			if i >= l {
+				mixed.f32 = append(mixed.f32, 0)
+				break
+			}
+			v, err := strconv.ParseFloat(items[i], 32)
+			if err != nil {
+				mixed.f32 = append(mixed.f32, 0)
+				continue
+			}
+			i += 1
+			mixed.f32 = append(mixed.f32, float32(v))
 		}
 	}
 }
@@ -232,11 +282,21 @@ func (mixed *I32F32) Parse(s string) {
 		mixed.f32 = make([]float32, len(items))
 		for x, v := range items {
 			in := strings.Split(v, ",")
-			mixed.i32[x] = xutils.ParseI32(in[0], 1)
-			if len(in) > 1 {
-				mixed.f32[x] = xutils.ParseF32(in[1], 0)
+			iv, err := strconv.ParseInt(in[0], 10, 32)
+			if err != nil {
+				mixed.i32[x] = 0
 			} else {
+				mixed.i32[x] = int32(iv)
+			}
+			if len(in) < 2 {
 				mixed.f32[x] = 0
+				continue
+			}
+			fv, err := strconv.ParseFloat(in[1], 32)
+			if err != nil {
+				mixed.f32[x] = 0
+			} else {
+				mixed.f32[x] = float32(fv)
 			}
 		}
 	} else {
@@ -245,8 +305,18 @@ func (mixed *I32F32) Parse(s string) {
 		mixed.i32 = make([]int32, 0, l)
 		mixed.f32 = make([]float32, 0, l)
 		for i := 1; i < len(items); i += 2 {
-			mixed.i32 = append(mixed.i32, xutils.ParseI32(items[i-1], 0))
-			mixed.f32 = append(mixed.f32, xutils.ParseF32(items[i], 0))
+			iv, err := strconv.ParseInt(items[i-1], 10, 32)
+			if err != nil {
+				mixed.i32 = append(mixed.i32, 0)
+			} else {
+				mixed.i32 = append(mixed.i32, int32(iv))
+			}
+			fv, err := strconv.ParseFloat(items[i], 32)
+			if err != nil {
+				mixed.f32 = append(mixed.f32, 0)
+			} else {
+				mixed.f32 = append(mixed.f32, float32(fv))
+			}
 		}
 	}
 }
