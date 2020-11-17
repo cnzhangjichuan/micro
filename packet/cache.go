@@ -272,6 +272,9 @@ func (c *chunk) Update(v Serializable, k string, upd func() bool, ini func()) {
 		v.Encode(pack)
 		c.m[k] = pack.buf[:pack.w]
 		pack.buf = nil
+		if c.saver != nil {
+			c.saver.Save(v, k)
+		}
 	} else if nfb {
 		pack.buf = nil
 	}
