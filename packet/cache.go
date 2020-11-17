@@ -30,6 +30,7 @@ type Cache interface {
 	Load(Serializable, string) bool
 	Put(string, Serializable)
 	Del(string)
+	Update(Serializable, string, func() bool, func())
 }
 
 // Saver 数据加载器
@@ -68,6 +69,14 @@ func (c *cache) Put(key string, data Serializable) {
 		return
 	}
 	c.cks[hashCode32(key)%c.cze].Put(key, data)
+}
+
+// Update 更新数据
+func (c *cache) Update(data Serializable, key string, upd func() bool, ini func()) {
+	if key == "" || data == nil {
+		return
+	}
+	c.cks[hashCode32(key)%c.cze].Update(data, key, upd, ini)
 }
 
 // Del 从缓存中删除数据
@@ -215,6 +224,59 @@ func (c *chunk) Del(k string) {
 		putBytes(pack)
 	}
 	c.Unlock()
+}
+
+// Update 更新数据
+func (c *chunk) Update(v Serializable, k string, upd func() bool, ini func()) {
+	var (
+		exists = false
+		ned    = false
+		nfb    = false
+		pack   *Packet
+	)
+
+	c.Lock()
+	if data, ok := c.m[k]; ok {
+		// 组装数据
+		pack = NewWithData(data)
+		if c.expired > 0 {
+			pack.Seek(4, -1)
+		}
+		v.Decode(pack)
+		exists = true
+		nfb = true
+	} else {
+		// 没有缓存，从磁盘加载
+		exists = c.loadFromDisk(v, k)
+		ned = exists
+		pack = New(512)
+	}
+
+	// 如果数据不存在，调用初始化方法
+	if !exists && ini != nil {
+		ini()
+		ned = true
+	}
+
+	// 执行更新操作
+	if upd != nil && upd() {
+		ned = true
+	}
+	if ned {
+		pack.Reset()
+		// 设置超时时间
+		if c.expired > 0 {
+			binary.BigEndian.PutUint32(pack.Allocate(4), uint32(time.Now().Add(c.expired).Unix()))
+		}
+		// 编码数据
+		v.Encode(pack)
+		c.m[k] = pack.buf[:pack.w]
+		pack.buf = nil
+	} else if nfb {
+		pack.buf = nil
+	}
+	c.Unlock()
+	Free(pack)
 }
 
 // clearExpired 清除过期数据
