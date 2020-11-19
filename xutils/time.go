@@ -35,3 +35,19 @@ func WeeksWithStamp(stamp int64) int {
 
 	return int(stamp / WEEK)
 }
+
+// ParseTime 时间转换
+func ParseTime(value string) (int64, error) {
+	const layout = `2006/01/02 15:04`
+
+	return ParseTimeWithLayout(layout, value)
+}
+
+// ParseTimeWithLayout 时间转换
+func ParseTimeWithLayout(layout, value string) (int64, error) {
+	t, err := time.ParseInLocation(layout, value, time.Local)
+	if err != nil {
+		return 0, err
+	}
+	return t.Unix(), nil
+}
