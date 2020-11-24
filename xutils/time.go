@@ -36,6 +36,17 @@ func WeeksWithStamp(stamp int64) int {
 	return int(stamp / WEEK)
 }
 
+// DaysWithDateString 距离1970-01-01日的天数
+func DaysWithDateString(value string) int {
+	const layout = `2006/01/02`
+
+	t, err := time.ParseInLocation(layout, value, time.UTC)
+	if err != nil {
+		return 0
+	}
+	return DaysWithStamp(t.Unix())
+}
+
 // ParseTime 时间转换
 func ParseTime(value string) (int64, error) {
 	const layout = `2006/01/02 15:04`
@@ -45,9 +56,14 @@ func ParseTime(value string) (int64, error) {
 
 // ParseTimeWithLayout 时间转换
 func ParseTimeWithLayout(layout, value string) (int64, error) {
-	t, err := time.ParseInLocation(layout, value, time.Local)
+	t, err := time.ParseInLocation(layout, value, time.UTC)
 	if err != nil {
 		return 0, err
 	}
 	return t.Unix(), nil
+}
+
+// DayInMonth 月中第几天
+func DaysOfMonth() int {
+	return time.Now().Day()
 }

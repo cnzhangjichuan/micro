@@ -129,78 +129,143 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 		return false
 	}
 
+	var (
+		wc          *wConn
+		cac         dpoCache
+		senderIndex uint32 = workerSize
+	)
+
 	// 获取远端地址
 	remote := pack.HTTPHeaderValue(httpRemoteAddress)
 	if remote == "" {
 		remote = conn.RemoteAddr().String()
 	}
 
-	// 处理握手数据
-	uid, isCompress, err := w.handshake(conn, pack)
-	if err != nil || uid == "" {
-		return true
-	}
+	if env.onLogin != nil {
+		// 如果设置了登入函数，需要校验登入Token
 
-	var (
-		wc                 = w.createWConn()
-		cac                = createDpoCache()
-		senderIndex uint32 = workerSize
-	)
+		// 处理握手数据
+		uid, isCompress, err := w.handshake(conn, pack)
+		if err != nil || uid == "" {
+			return true
+		}
+		cac := createDpoCache()
 
-	// 将自身注册到会话中(初始化)
-	wc.uid = uid
-	wc.conn = conn
-	wc.isCompressed = isCompress
-	if w.RegisterConn(wc) && env.onLogin != nil {
-		// 调用登入
-		dpo := w.createDpo()
-		dpo.uid = uid
-		dpo.pack = pack
-		dpo.cache = cac
-		dpo.group = &wc.group
-		env.onLogin(dpo)
-		w.freeDpo(dpo)
-	}
+		// 将自身注册到会话中
+		wc := w.createWConn()
+		wc.uid = uid
+		wc.conn = conn
+		wc.isCompressed = isCompress
+		if w.RegisterConn(wc) && env.onLogin != nil {
+			// 调用登入
+			dpo := w.createDpo()
+			dpo.uid = uid
+			dpo.pack = pack
+			dpo.cache = cac
+			dpo.group = &wc.group
+			env.onLogin(dpo)
+			w.freeDpo(dpo)
+		}
 
-	// 处理数据
-	var payload = make([]byte, 8)
-	for {
-		// 读取数据
-		err = w.decodeWebsocket(conn, pack, payload)
+		// 处理数据
+		var payload = make([]byte, 8)
+		for {
+			// 组装业务参数
+			err = w.decodeWebsocket(conn, pack, payload)
+			if err != nil {
+				break
+			}
+			api := xutils.UnsafeBytesToString(pack.ReadWhen('{'))
+			dpo := w.createDpo()
+			dpo.uid = uid
+			dpo.cache = cac
+			dpo.pack = pack
+			dpo.group = &wc.group
+			dpo.SetRemote(remote)
+
+			// 调用业务接口
+			if resp := w.callAPI(dpo, api); resp != nil {
+				w.encodingResponseData(dpo.pack, api, resp, isCompress)
+				ad := w.NewRespAutoData(dpo.pack.Copy())
+				senderIndex = w.AddRespConnData(conn, ad, senderIndex)
+				w.freeAutoData(ad)
+			}
+			w.freeDpo(dpo)
+		}
+	} else {
+		// 不需要登入Token, 一般用于网页端的直接接入
+
+		// 处理握手数据
+		uid, isCompress, err := w.handshake(conn, pack)
 		if err != nil {
-			break
+			return true
 		}
-		api := xutils.UnsafeBytesToString(pack.ReadWhen('{'))
-		dpo := w.createDpo()
-		dpo.uid = uid
-		dpo.cache = cac
-		dpo.pack = pack
-		dpo.group = &wc.group
-		dpo.SetRemote(remote)
-		// 调用业务接口
-		if resp := w.callAPI(dpo, api); resp != nil {
-			w.encodingResponseData(dpo.pack, api, resp, isCompress)
-			ad := w.NewRespAutoData(dpo.pack.Copy())
-			senderIndex = w.AddRespConnData(conn, ad, senderIndex)
-			w.freeAutoData(ad)
+		cac := createDpoCache()
+		wc := w.createWConn()
+
+		// 处理数据
+		var payload = make([]byte, 8)
+		for {
+			// 组装业务参数
+			err = w.decodeWebsocket(conn, pack, payload)
+			if err != nil {
+				break
+			}
+			api := xutils.UnsafeBytesToString(pack.ReadWhen('{'))
+			dpo := w.createDpo()
+			dpo.uid = uid
+			dpo.cache = cac
+			dpo.pack = pack
+			dpo.group = &wc.group
+			dpo.SetRemote(remote)
+
+			// 校验登入状态
+			if !env.authorize.CheckAPI(dpo.uid, api) {
+				w.encodingResponseData(dpo.pack, api, apiNotFoundError, isCompress)
+				ad := w.NewRespAutoData(dpo.pack.Copy())
+				senderIndex = w.AddRespConnData(conn, ad, senderIndex)
+				w.freeAutoData(ad)
+			} else {
+				// 调用业务接口
+				resp := w.callAPI(dpo, api)
+
+				// 将自身注册到会话中
+				if dpo.uid != "" && dpo.uid != uid {
+					uid = dpo.uid
+					if wc.uid != "" {
+						w.UnRegisterConn(wc)
+					}
+					wc.uid = uid
+					wc.conn = conn
+					wc.isCompressed = isCompress
+					w.RegisterConn(wc)
+				}
+
+				// 发送响应数据
+				if resp != nil {
+					w.encodingResponseData(dpo.pack, api, resp, isCompress)
+					ad := w.NewRespAutoData(dpo.pack.Copy())
+					senderIndex = w.AddRespConnData(conn, ad, senderIndex)
+					w.freeAutoData(ad)
+				}
+			}
+			w.freeDpo(dpo)
 		}
-		w.freeDpo(dpo)
 	}
 
-	// 登出
+	// 释放资源
 	if w.UnRegisterConn(wc) && env.onLogout != nil {
 		dpo := w.createDpo()
-		dpo.uid = uid
+		dpo.uid = wc.uid
 		dpo.cache = cac
 		dpo.pack = pack
+		dpo.group = &wc.group
 		dpo.SetRemote(remote)
 		env.onLogout(dpo)
 		w.freeDpo(dpo)
 	}
-
-	// 释放资源
-	freeDpoCache(cac)
 	w.freeWConn(wc)
+	freeDpoCache(cac)
 
 	return true
 }
@@ -216,11 +281,6 @@ func (w *websocket) Close() {
 
 // callAPI 调用业务接口
 func (w *websocket) callAPI(dpo *wsDpo, api string) interface{} {
-	// 没有登录
-	if !env.authorize.CheckAPI(dpo.uid, api) {
-		return noLoginError
-	}
-
 	// 没有发现业务接口
 	bis, ok := findBis(api)
 	if !ok {
@@ -257,10 +317,6 @@ func (w *websocket) handshake(conn net.Conn, pack *packet.Packet) (uid string, i
 		if len(protocols) > 1 {
 			uid = strings.TrimSpace(protocols[1])
 		}
-		if uid == "" {
-			// 生成UID
-			uid = xutils.GUID(0)
-		}
 	}
 
 	secWK := pack.HTTPHeaderValue(wsKey)
@@ -270,7 +326,7 @@ func (w *websocket) handshake(conn net.Conn, pack *packet.Packet) (uid string, i
 	pack.ReadHTTPBody(conn)
 	pack.Reset()
 	pack.Write(wsRespOK)
-	if len(protocols) > 0 {
+	if env.onLogin != nil {
 		pack.Write(wsProtocol)
 		pack.Write(xutils.UnsafeStringToBytes(protocols[0]))
 		pack.Write(httpRowAt)
@@ -432,6 +488,7 @@ func (w *websocket) createDpo() *wsDpo {
 // FreeDpo 释放处理对象
 func (w *websocket) freeDpo(dpo *wsDpo) {
 	dpo.pack = nil
+	dpo.group = nil
 	dpo.release()
 	w.dpoPool.Put(dpo)
 }
@@ -523,7 +580,7 @@ func (w *websocket) RegisterConn(c *wConn) (isNewConn bool) {
 
 // UnRegisterConn 从会话中注销
 func (w *websocket) UnRegisterConn(c *wConn) (isMine bool) {
-	if c == nil {
+	if c == nil || c.uid == "" {
 		return
 	}
 	idx := xutils.HashCode32(c.uid) % chunkSize
