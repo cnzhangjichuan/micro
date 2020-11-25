@@ -15,7 +15,11 @@ func (p *Packet) UnCompress(s int) {
 	}
 	r := p.r
 	p.Seek(s, -1)
-	gzr, _ := zlib.NewReader(p)
+	gzr, err := zlib.NewReader(p)
+	if err != nil {
+		p.r = r
+		return
+	}
 	rpf := New(10 * (p.w - s))
 	buf := getBytes(BS)[:BS]
 	io.CopyBuffer(rpf, gzr, buf)
@@ -35,7 +39,11 @@ func (p *Packet) GzipUnCompress(s int) {
 	}
 	r := p.r
 	p.Seek(s, -1)
-	gzr, _ := gzip.NewReader(p)
+	gzr, err := gzip.NewReader(p)
+	if err != nil {
+		p.r = r
+		return
+	}
 	rpf := New(10 * (p.w - s))
 	buf := getBytes(BS)[:BS]
 	io.CopyBuffer(rpf, gzr, buf)

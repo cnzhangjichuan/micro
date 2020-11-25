@@ -247,9 +247,9 @@ func (r *Rankings) swap(i, j int) {
 	r.items[j].Data, r.items[i].Data = r.items[i].Data, r.items[j].Data
 }
 
-// Close 将数据保存到磁盘上。
+// Save 将数据保存到磁盘上。
 // 在服务器关之前调用，保存到数据库中。
-func (r *Rankings) Close() {
+func (r *Rankings) Save() {
 	const initCacheSize = 4096
 
 	if r.saver == nil {
