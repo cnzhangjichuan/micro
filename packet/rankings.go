@@ -11,19 +11,17 @@ type Rankings struct {
 	name  string
 	saver SingleSaver
 	items []rankingItem
-	edIns RankingItem
 }
 
 // Init 初始化
-func (r *Rankings) Init(name string, capacity int, edIns RankingItem, saver SingleSaver) {
+func (r *Rankings) Init(name string, capacity int, enc RankingItem, saver SingleSaver) {
 	r.name = name
 	r.items = make([]rankingItem, capacity)
-	r.edIns = edIns
 	for i := 0; i < capacity; i++ {
 		r.items[i].Rank = int32(i + 1)
 	}
 	r.saver = saver
-	r.loadData()
+	r.loadData(enc)
 }
 
 // RankingItem 数据结果
@@ -205,12 +203,12 @@ func (r *Rankings) Update(item RankingItem) (rank, delta int32) {
 }
 
 // Replace 将指定位置的数据替换掉
-func (r *Rankings) Replace(mine RankingItem, dest string) (rank, delta int32) {
+func (r *Rankings) Replace(mine RankingItem, dest string) (rank, raise int32) {
 	r.Lock()
 	destIdx := r.findIndex(dest)
 	if destIdx == -1 {
 		r.Unlock()
-		rank, delta = -1, 0
+		rank, raise = -1, 0
 		return
 	}
 	rank = r.items[destIdx].Rank
@@ -224,7 +222,7 @@ func (r *Rankings) Replace(mine RankingItem, dest string) (rank, delta int32) {
 	}
 	r.updateItem(destIdx, mine)
 	r.Unlock()
-	delta = oRank - rank
+	raise = oRank - rank
 	return
 }
 
@@ -248,8 +246,9 @@ func (r *Rankings) swap(i, j int) {
 }
 
 // Save 将数据保存到磁盘上。
-// 在服务器关之前调用，保存到数据库中。
-func (r *Rankings) Save() {
+// 在服务器关闭之前调用，保存到数据库中。
+// dec 数据解码器
+func (r *Rankings) Save(dec Decoder) {
 	const initCacheSize = 4096
 
 	if r.saver == nil {
@@ -257,8 +256,8 @@ func (r *Rankings) Save() {
 	}
 
 	pack := New(initCacheSize)
-	encoder := packetPool.Get().(*Packet)
-	encoder.freed = 0
+	buff := packetPool.Get().(*Packet)
+	buff.freed = 0
 	r.RLock()
 	for i := 0; i < len(r.items); i++ {
 		if r.items[i].Id == "" {
@@ -266,23 +265,24 @@ func (r *Rankings) Save() {
 		}
 		pack.WriteString(r.items[i].Id)
 		pack.WriteI32(r.items[i].Value)
-		encoder.buf = r.items[i].Data
-		encoder.r, encoder.w = 0, len(encoder.buf)
-		r.edIns.Decode(encoder)
-		encoder.Reset()
-		encoder.EncodeJSON(r.edIns, false, false)
-		pack.WriteBytes(encoder.Data())
+		buff.buf = r.items[i].Data
+		buff.r, buff.w = 0, len(buff.buf)
+		dec.Decode(buff)
+		buff.Reset()
+		buff.EncodeJSON(dec, false, false)
+		pack.WriteBytes(buff.Data())
 	}
 	r.RUnlock()
 	pack.Compress(0)
 	r.saver.Save(r.name, pack.Data())
-	encoder.buf = nil
-	Free(encoder)
+	buff.buf = nil
+	Free(buff)
 	Free(pack)
 }
 
 // loadData 从数据库中初始化数据
-func (r *Rankings) loadData() {
+// enc 数据编码器
+func (r *Rankings) loadData(enc Encoder) {
 	if r.saver == nil {
 		return
 	}
@@ -292,8 +292,8 @@ func (r *Rankings) loadData() {
 	}
 	pack := NewWithData(data)
 	pack.UnCompress(0)
-	decoder := packetPool.Get().(*Packet)
-	decoder.freed = 0
+	buff := packetPool.Get().(*Packet)
+	buff.freed = 0
 	r.Lock()
 	for i := 0; i < len(r.items); i++ {
 		r.items[i].Id = pack.ReadString()
@@ -301,16 +301,16 @@ func (r *Rankings) loadData() {
 			break
 		}
 		r.items[i].Value = pack.ReadI32()
-		decoder.buf = pack.ReadBytes()
-		decoder.r, decoder.w = 0, len(decoder.buf)
-		decoder.DecodeJSON(r.edIns)
-		decoder.Reset()
-		r.edIns.Encode(decoder)
-		r.items[i].Data = decoder.Data()
+		buff.buf = pack.ReadBytes()
+		buff.r, buff.w = 0, len(buff.buf)
+		buff.DecodeJSON(enc)
+		buff.Reset()
+		enc.Encode(buff)
+		r.items[i].Data = buff.Data()
 	}
 	r.Unlock()
-	decoder.buf = nil
-	Free(decoder)
+	buff.buf = nil
+	Free(buff)
 	pack.buf = nil
 	Free(pack)
 }
