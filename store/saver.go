@@ -1,7 +1,6 @@
 package store
 
 import (
-	"encoding/hex"
 	"strconv"
 	"strings"
 
@@ -126,8 +125,8 @@ func (s *singleSaver) Save(id string, data []byte) (ok bool) {
 		env.RUnlock()
 		return
 	}
-
-	v := hex.EncodeToString(data)
+	// 压缩数据
+	v := packet.CompressToString(data)
 	_, err := env.db.Exec(s.insert, id, v, v)
 	env.RUnlock()
 	if err != nil {
@@ -156,8 +155,7 @@ func (s *singleSaver) Find(id string) (data []byte, ok bool) {
 	err := r.Scan(&data)
 	ok = err == nil
 	if ok {
-		n, _ := hex.Decode(data, data)
-		data = data[:n]
+		data = packet.UnCompress(data)
 	}
 	return
 }

@@ -273,7 +273,6 @@ func (r *Rankings) Save(dec Decoder) {
 		pack.WriteBytes(buff.Data())
 	}
 	r.RUnlock()
-	pack.Compress(0)
 	r.saver.Save(r.name, pack.Data())
 	buff.buf = nil
 	Free(buff)
@@ -291,7 +290,6 @@ func (r *Rankings) loadData(enc Encoder) {
 		return
 	}
 	pack := NewWithData(data)
-	pack.UnCompress(0)
 	buff := packetPool.Get().(*Packet)
 	buff.freed = 0
 	r.Lock()
