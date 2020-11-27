@@ -49,6 +49,9 @@ func (p *Packet) EncodeJSONWithAPI(v interface{}, isGzip, prefix bool, api []byt
 
 // DecodeJSON 反序列化json数据
 func (p *Packet) DecodeJSON(v interface{}) error {
+	if p.r >= p.w {
+		return nil
+	}
 	if p.buf[p.r] == 1 {
 		p.r++
 		p.UnCompress(p.r)

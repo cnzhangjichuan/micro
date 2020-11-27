@@ -1,6 +1,7 @@
 package packet
 
 import (
+	"math/rand"
 	"sync"
 )
 
@@ -8,20 +9,22 @@ import (
 type Rankings struct {
 	sync.RWMutex
 
-	name  string
-	saver SingleSaver
-	items []rankingItem
+	name     string
+	saver    SingleSaver
+	items    []rankingItem
+	edCreate func() RankingItem
 }
 
 // Init 初始化
-func (r *Rankings) Init(name string, capacity int, enc RankingItem, saver SingleSaver) {
+func (r *Rankings) Init(name string, capacity int, edCreate func() RankingItem, saver SingleSaver) {
 	r.name = name
 	r.items = make([]rankingItem, capacity)
 	for i := 0; i < capacity; i++ {
 		r.items[i].Rank = int32(i + 1)
 	}
 	r.saver = saver
-	r.loadData(enc)
+	r.edCreate = edCreate
+	r.loadData()
 }
 
 // RankingItem 数据结果
@@ -63,44 +66,91 @@ func (r *Rankings) GetRank(id string) int32 {
 	return r.items[i].Rank
 }
 
-// LoadRankings 加载榜单
-func (r *Rankings) LoadRankings(creator func(int) RankingItem, offset, count int, id string) (n int) {
+type RankingResult struct {
+	List []RankingItem
+}
+
+// Encode 实现packet.Encoder接口
+func (resp *RankingResult) Encode(p *Packet) {
+	cList := uint64(len(resp.List))
+	p.WriteU64(cList)
+	for i := uint64(0); i < cList; i++ {
+		resp.List[i].Encode(p)
+	}
+}
+
+// GetRankings 获取榜单列表
+func (r *Rankings) GetRankings(offset, count int, id string) (ret *RankingResult) {
+	ret = &RankingResult{}
 	e := offset + count
 	if e > len(r.items) {
 		e = len(r.items)
 	}
 	if offset >= e {
-		return 0
+		return
 	}
 	idIdx := -1
 	pack := packetPool.Get().(*Packet)
 	pack.freed = 0
 	r.RLock()
+
+	// 加载自身的排名
+	ls := e - offset
 	if id != "" {
 		idIdx = r.findIndex(id)
 		if idIdx >= offset && idIdx < e {
+			// 如果自身排名在列表中，不再单独加载
 			idIdx = -1
-		} else if idIdx != -1 {
-			e -= 1
+		}
+		if idIdx != -1 {
+			ls += 1
 		}
 	}
+
+	// 将数据装入结果列表中
+	ret.List = make([]RankingItem, 0, ls)
 	if idIdx != -1 && idIdx < offset {
-		n = r.setRankingItem(pack, creator, idIdx, n)
+		r.loadRankingItem(ret, pack, idIdx)
 	}
 	for i := offset; i < e; i++ {
-		n = r.setRankingItem(pack, creator, i, n)
+		r.loadRankingItem(ret, pack, i)
 	}
 	if idIdx >= e {
-		n = r.setRankingItem(pack, creator, idIdx, n)
+		r.loadRankingItem(ret, pack, idIdx)
 	}
 	r.RUnlock()
+
 	pack.buf = nil
 	Free(pack)
 	return
 }
 
-// LoadNears 加载与自身相邻的榜单数据
-func (r *Rankings) LoadNears(creator func(i int) RankingItem, id string, window []int, top3 bool) (n int) {
+// GetNearWindow 获取附近的滑动窗体
+func (r *Rankings) GetNearWindow(leftCount, rightCount, step int) []int32 {
+	window := make([]int32, leftCount+rightCount)
+	v := int32(0)
+	stp := int32(step)
+	if stp < 2 {
+		stp = 2
+	}
+	for i := leftCount - 1; i >= 0; i-- {
+		v -= rand.Int31n(stp) + 1
+		window[i] = v
+	}
+	ls := leftCount + rightCount
+	v = 0
+	for i := leftCount; i < ls; i++ {
+		v += rand.Int31n(stp) + 1
+		window[i] = v
+	}
+	return window
+}
+
+// GetNears 加载与自身相邻的榜单数据
+func (r *Rankings) GetNears(id string, window []int32, top int) (ret *RankingResult) {
+	ret = &RankingResult{}
+
+	// 查找自身所在的索引位置
 	r.RLock()
 	cdx := r.findIndex(id)
 	r.RUnlock()
@@ -109,16 +159,16 @@ func (r *Rankings) LoadNears(creator func(i int) RankingItem, id string, window 
 	pack.freed = 0
 
 	// 装载数据
-	ids := r.calNearCoordinate(window, cdx, top3)
+	ids := r.calNearCoordinate(window, cdx, top)
 	r.RLock()
 	for _, i := range ids {
-		n = r.setRankingItem(pack, creator, i, n)
+		r.loadRankingItem(ret, pack, i)
 	}
 	r.RUnlock()
 
 	pack.buf = nil
 	Free(pack)
-	return n
+	return
 }
 
 // Update 更新数据
@@ -247,17 +297,16 @@ func (r *Rankings) swap(i, j int) {
 
 // Save 将数据保存到磁盘上。
 // 在服务器关闭之前调用，保存到数据库中。
-// dec 数据解码器
-func (r *Rankings) Save(dec Decoder) {
+func (r *Rankings) Save() {
 	const initCacheSize = 4096
 
-	if r.saver == nil {
+	if r.saver == nil && r.edCreate != nil {
 		return
 	}
 
 	pack := New(initCacheSize)
-	buff := packetPool.Get().(*Packet)
-	buff.freed = 0
+	buff := New(1024)
+	dec := r.edCreate()
 	r.RLock()
 	for i := 0; i < len(r.items); i++ {
 		if r.items[i].Id == "" {
@@ -265,24 +314,24 @@ func (r *Rankings) Save(dec Decoder) {
 		}
 		pack.WriteString(r.items[i].Id)
 		pack.WriteI32(r.items[i].Value)
-		buff.buf = r.items[i].Data
-		buff.r, buff.w = 0, len(buff.buf)
-		dec.Decode(buff)
+		rs := pack.w
+		pack.r = rs
+		pack.Write(r.items[i].Data)
+		dec.Decode(pack)
+		pack.r, pack.w = 0, rs
 		buff.Reset()
 		buff.EncodeJSON(dec, false, false)
 		pack.WriteBytes(buff.Data())
 	}
 	r.RUnlock()
 	r.saver.Save(r.name, pack.Data())
-	buff.buf = nil
 	Free(buff)
 	Free(pack)
 }
 
 // loadData 从数据库中初始化数据
-// enc 数据编码器
-func (r *Rankings) loadData(enc Encoder) {
-	if r.saver == nil {
+func (r *Rankings) loadData() {
+	if r.saver == nil && r.edCreate != nil {
 		return
 	}
 	data, ok := r.saver.Find(r.name)
@@ -292,6 +341,7 @@ func (r *Rankings) loadData(enc Encoder) {
 	pack := NewWithData(data)
 	buff := packetPool.Get().(*Packet)
 	buff.freed = 0
+	enc := r.edCreate()
 	r.Lock()
 	for i := 0; i < len(r.items); i++ {
 		r.items[i].Id = pack.ReadString()
@@ -340,61 +390,68 @@ func (r *Rankings) updateItem(i int, src RankingItem) {
 }
 
 // setRankingItem 填充数据
-func (r *Rankings) setRankingItem(pack *Packet, creator func(int) RankingItem, i, n int) int {
+func (r *Rankings) loadRankingItem(ret *RankingResult, pack *Packet, i int) {
 	if r.items[i].Id == "" {
-		return n
+		return
 	}
 	pack.buf = r.items[i].Data
 	pack.r, pack.w = 0, len(pack.buf)
-	item := creator(n)
+	item := r.edCreate()
 	item.Decode(pack)
 	item.SetRank(r.items[i].Rank)
-	return n + 1
+	ret.List = append(ret.List, item)
 }
 
 // calNearCoordinate 计算邻近的下标列表
-func (r *Rankings) calNearCoordinate(window []int, cdx int, top3 bool) []int {
-	coordinates := make([]int, 0, len(window)+4)
+func (r *Rankings) calNearCoordinate(window []int32, cdx int, top int) []int {
+	if top < 0 {
+		top = 0
+	}
+	coordinates := make([]int, 0, len(window)+top)
 
-	// 加入top3
-	if top3 {
-		coordinates = append(coordinates, 0, 1, 2)
+	// 加入top
+	for i := 0; i < top; i++ {
+		coordinates = append(coordinates, i)
 	}
 
 	rMax := len(r.items) - 1
-	wMax := window[len(window)-1]
+	wMax := int(window[len(window)-1])
 
-	// 未入榜
-	if cdx == -1 {
-		s := rMax - wMax
-		for _, i := range window {
-			coordinates = append(coordinates, i+s)
-		}
-		return coordinates
+	mdx := cdx
+	// 未入榜时定位到榜未
+	if mdx == -1 {
+		mdx = rMax - wMax
 	}
 
-	// 计算榜中位置
-	ofx := cdx + window[0] - 3
-	s := cdx
-	if ofx < 0 {
-		s -= ofx
+	if mdx+int(window[0]) < top {
+		// 在top中时，定位到top榜外
+		mdx = top - int(window[0])
+	} else if mdx+wMax > rMax {
+		// 超出榜尾时，定位到榜尾
+		mdx = rMax - wMax
 	}
-	ofx = cdx + wMax - rMax
-	if ofx > 0 {
-		s -= ofx
-	}
-	if top3 && cdx < 3 {
+
+	// 去除top榜中数据
+	if cdx < top {
 		cdx = -1
 	}
+
+	// 放入数据索引
 	for _, i := range window {
-		ofx = i + s
-		if cdx == ofx {
-			cdx = -1
-		} else if cdx != -1 && cdx < ofx {
-			coordinates = append(coordinates, cdx)
-			cdx = -1
+		rdx := int(i) + mdx
+		if rdx < 0 || rdx > rMax {
+			continue
 		}
-		coordinates = append(coordinates, ofx)
+		if cdx != -1 {
+			if rdx == cdx {
+				cdx = -1
+			} else if rdx > cdx {
+				coordinates = append(coordinates, cdx)
+				cdx = -1
+			}
+		}
+		coordinates = append(coordinates, rdx)
 	}
+
 	return coordinates
 }
