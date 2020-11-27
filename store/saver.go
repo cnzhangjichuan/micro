@@ -125,37 +125,40 @@ func (s *singleSaver) Save(id string, data []byte) (ok bool) {
 		env.RUnlock()
 		return
 	}
-	// 压缩数据
-	v := packet.CompressToString(data)
-	_, err := env.db.Exec(s.insert, id, v, v)
-	env.RUnlock()
-	if err != nil {
-		if env.backupOnError != nil {
-			env.backupOnError(s.insert, err)
+
+	packet.Compress(data, func(v string) {
+		_, err := env.db.Exec(s.insert, id, v, v)
+		if err != nil {
+			if env.backupOnError != nil {
+				env.backupOnError(s.insert, err)
+			}
+		} else {
+			ok = true
 		}
-	} else {
-		ok = true
-	}
+	})
+	env.RUnlock()
+
 	return
 }
 
 // Find 从表数据库中查询数据
-func (s *singleSaver) Find(id string) (data []byte, ok bool) {
+func (s *singleSaver) Find(id string, call func(*packet.Packet)) bool {
 	if s == nil {
-		return
+		return false
 	}
 	env.RLock()
 	if env.db == nil {
 		env.RUnlock()
-		return
+		return false
 	}
 	r := env.db.QueryRow(s.query, id)
 	env.RUnlock()
 
+	var data []byte
 	err := r.Scan(&data)
-	ok = err == nil
-	if ok {
-		data = packet.UnCompress(data)
+	if err != nil {
+		return false
 	}
-	return
+
+	return packet.UnCompress(data, call)
 }

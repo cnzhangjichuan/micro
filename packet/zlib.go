@@ -5,45 +5,47 @@ import (
 	"compress/zlib"
 	"encoding/hex"
 	"io"
+	"unsafe"
 )
 
 // UnCompress 解压数据
-func UnCompress(data []byte) []byte {
+func UnCompress(data []byte, call func(*Packet)) bool {
 	const BS = 1024
 
 	if len(data) == 0 {
-		return []byte{}
+		return false
 	}
 
 	ls := hex.DecodedLen(len(data))
 	p := New(ls)
-	p.w, _ = hex.Decode(p.Allocate(ls), data)
-	if b, _ := p.ReadByte(); b == 0 {
-		data = p.Data()
-		p.buf = nil
+
+	var err error
+	p.w, err = hex.Decode(p.Allocate(ls), data)
+	if err != nil {
 		Free(p)
-		return data
+		return false
+	}
+	if b, _ := p.ReadByte(); b == 0 {
+		call(p)
+		Free(p)
+		return true
 	}
 
 	gzr, err := zlib.NewReader(p)
 	if err != nil {
-		data = p.Data()
-		p.buf = nil
+		call(p)
 		Free(p)
-		return data
+		return true
 	}
-	rpf := New(10 * p.w)
+	ret := New(10 * ls)
 	buf := getBytes(BS)[:BS]
-	io.CopyBuffer(rpf, gzr, buf)
+	io.CopyBuffer(ret, gzr, buf)
 	putBytes(buf)
 	gzr.Close()
 	Free(p)
-
-	ret := rpf.buf
-	rpf.buf = nil
-	Free(rpf)
-
-	return ret
+	call(ret)
+	Free(ret)
+	return true
 }
 
 // UnCompress 从指定的位置解压数据
@@ -95,28 +97,33 @@ func (p *Packet) GzipUnCompress(s int) {
 }
 
 // Compress 压缩数据
-func CompressToString(data []byte) string {
+func Compress(data []byte, call func(string)) bool {
 	if len(data) == 0 {
-		return `00`
-	}
-	wpf := New(len(data) + 1)
-	wpf.WriteByte(1)
-	gzw, err := zlib.NewWriterLevel(wpf, zlib.BestSpeed)
-	if err == nil {
-		gzw.Write(data)
-		gzw.Flush()
-		gzw.Close()
+		call(`00`)
+		return false
 	}
 
+	ok := true
+	wpf := New(len(data) * 2)
+	wpf.WriteByte(1)
+	gzw, _ := zlib.NewWriterLevel(wpf, zlib.BestSpeed)
+	gzw.Write(data)
+	gzw.Flush()
+	gzw.Close()
+
 	if wpf.Size() >= len(data) {
+		ok = false
 		wpf.Reset()
 		wpf.WriteByte(0)
 		wpf.Write(data)
 	}
 
-	ret := hex.EncodeToString(wpf.Data())
+	s := wpf.Size()
+	dst := wpf.Allocate(s * 2)
+	hex.Encode(dst, wpf.Slice(0, s))
+	call(*(*string)(unsafe.Pointer(&dst)))
 	Free(wpf)
-	return ret
+	return ok
 }
 
 // Compress 从指定的位置压缩数据

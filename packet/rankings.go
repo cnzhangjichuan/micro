@@ -43,7 +43,7 @@ type SingleSaver interface {
 	Save(id string, data []byte) (ok bool)
 
 	// Find 从数据表中查询数据
-	Find(id string) (data []byte, ok bool)
+	Find(id string, call func(*Packet)) (ok bool)
 }
 
 // rankingItem 排名序列内部结构
@@ -298,14 +298,17 @@ func (r *Rankings) swap(i, j int) {
 // Save 将数据保存到磁盘上。
 // 在服务器关闭之前调用，保存到数据库中。
 func (r *Rankings) Save() {
-	const initCacheSize = 4096
+	const (
+		initCacheSize = 4096
+		buffItemSize = 1024
+	)
 
 	if r.saver == nil && r.edCreate != nil {
 		return
 	}
 
 	pack := New(initCacheSize)
-	buff := New(1024)
+	buff := New(buffItemSize)
 	dec := r.edCreate()
 	r.RLock()
 	for i := 0; i < len(r.items); i++ {
@@ -334,33 +337,28 @@ func (r *Rankings) loadData() {
 	if r.saver == nil && r.edCreate != nil {
 		return
 	}
-	data, ok := r.saver.Find(r.name)
-	if !ok || len(data) == 0 {
-		return
-	}
-	pack := NewWithData(data)
-	buff := packetPool.Get().(*Packet)
-	buff.freed = 0
-	enc := r.edCreate()
-	r.Lock()
-	for i := 0; i < len(r.items); i++ {
-		r.items[i].Id = pack.ReadString()
-		if r.items[i].Id == "" {
-			break
+	r.saver.Find(r.name, func(pack *Packet) {
+		buff := packetPool.Get().(*Packet)
+		buff.freed = 0
+		enc := r.edCreate()
+		r.Lock()
+		for i := 0; i < len(r.items); i++ {
+			r.items[i].Id = pack.ReadString()
+			if r.items[i].Id == "" {
+				break
+			}
+			r.items[i].Value = pack.ReadI32()
+			buff.buf = pack.ReadBytes()
+			buff.r, buff.w = 0, len(buff.buf)
+			buff.DecodeJSON(enc)
+			buff.Reset()
+			enc.Encode(buff)
+			r.items[i].Data = buff.Data()
 		}
-		r.items[i].Value = pack.ReadI32()
-		buff.buf = pack.ReadBytes()
-		buff.r, buff.w = 0, len(buff.buf)
-		buff.DecodeJSON(enc)
-		buff.Reset()
-		enc.Encode(buff)
-		r.items[i].Data = buff.Data()
-	}
-	r.Unlock()
-	buff.buf = nil
-	Free(buff)
-	pack.buf = nil
-	Free(pack)
+		r.Unlock()
+		buff.buf = nil
+		Free(buff)
+	})
 }
 
 // 查找ID位置
