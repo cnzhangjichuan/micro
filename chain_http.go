@@ -2,6 +2,7 @@ package micro
 
 import (
 	"bytes"
+	"encoding/xml"
 	"io/ioutil"
 	"net"
 	"os"
@@ -17,9 +18,10 @@ import (
 type http struct {
 	baseChain
 
-	asm     sync.RWMutex
-	assets  map[string][]byte
-	dpoPool sync.Pool
+	asm              sync.RWMutex
+	assets           map[string][]byte
+	dpoPool          sync.Pool
+	dpoThirdPartPool sync.Pool
 }
 
 // Init 初始化
@@ -27,6 +29,9 @@ func (h *http) Init() {
 	h.assets = make(map[string][]byte, 64)
 	h.dpoPool.New = func() interface{} {
 		return &httpDpo{}
+	}
+	h.dpoThirdPartPool.New = func() interface{} {
+		return &thirdHttpDpo{}
 	}
 }
 
@@ -46,7 +51,7 @@ func (h *http) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 	const (
 		WT              = time.Second * 10
 		RT              = time.Second * 30
-		thirdPartPrefix = `/third-part/`
+		thirdPartPrefix = `third-part/`
 	)
 
 	if name != "" {
@@ -98,6 +103,15 @@ func (h *http) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 				path := string(pack.DataBetween(httpPathStart, httpPathEnd))
 				if strings.HasPrefix(path, thirdPartPrefix) {
 					// 处理第三方调用
+					pdx := strings.IndexByte(path, '?')
+					if pdx < 0 {
+						api = path[len(thirdPartPrefix):]
+					} else {
+						api = path[len(thirdPartPrefix):pdx]
+					}
+					if err := h.processThirdPartRequest(conn, pack, api, remote, isClosed); err != nil {
+						break
+					}
 				} else {
 					// 处理静态资源
 					if err := h.sendResource(conn, pack, path, isZlib, isClosed); err != nil {
@@ -121,8 +135,90 @@ func (h *http) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 	return true
 }
 
+// processThirdPartRequest 处理第三方接入
+func (h *http) processThirdPartRequest(conn net.Conn, pack *packet.Packet, api, remote string, isClosed bool) error {
+	var (
+		resp interface{}
+		typ  string
+	)
+
+	bis, ok := findBis(api)
+	if !ok {
+		// not found api
+		pack.Reset()
+		pack.Write(httpRespOk)
+		if isClosed {
+			pack.Write(httpConnectionClose)
+		}
+		pack.Write(httpRespContent0)
+		pack.Write(httpRowAt)
+		_, err := pack.FlushToConn(conn)
+		return err
+	}
+
+	dpo := h.createThirdPartDpo()
+	// 读取消息体
+	pack.ReadHTTPBody(conn)
+	dpo.pack = pack
+	// 设置远端数据
+	dpo.SetRemote(remote)
+	resp, typ = bis(dpo)
+	h.freeThirdPartDpo(dpo)
+
+	// 设置响应数据
+	pack.Reset()
+	pack.Write(httpRespOk)
+
+	switch typ {
+	default:
+		// json
+		s := pack.Size()
+		_, err := pack.EncodeJSON(resp, false, false)
+		if err != nil {
+			pack.Write(httpRespContent0)
+			pack.Write(httpRowAt)
+		} else {
+			e := pack.Size()
+			pack.Write(httpContentLength)
+			pack.Write(xutils.ParseIntToBytes(int64(e - s)))
+			pack.Write(httpRowAt)
+			pack.Write(httpRowAt)
+			pack.MoveToEnd(s, e)
+		}
+	case `xml`:
+		data, err := xml.Marshal(resp)
+		if err != nil {
+			pack.Write(httpRespContent0)
+			pack.Write(httpRowAt)
+		} else {
+			s := pack.Size()
+			pack.Write(data)
+			e := pack.Size()
+			pack.Write(httpContentLength)
+			pack.Write(xutils.ParseIntToBytes(int64(e - s)))
+			pack.Write(httpRowAt)
+			pack.Write(httpRowAt)
+			pack.MoveToEnd(s, e)
+		}
+	case `string`:
+		if s, ok := resp.(string); !ok {
+			pack.Write(httpRespContent0)
+			pack.Write(httpRowAt)
+		} else {
+			bs := xutils.UnsafeStringToBytes(s)
+			pack.Write(httpContentLength)
+			pack.Write(xutils.ParseIntToBytes(int64(len(bs))))
+			pack.Write(httpRowAt)
+			pack.Write(httpRowAt)
+			pack.Write(bs)
+		}
+	}
+	_, err := pack.FlushToConn(conn)
+	return err
+}
+
 // callAPI 调用api
-func (h *http) callAPI(conn net.Conn, pack *packet.Packet, api, remote string, isZlib bool, cac map[string]interface{}, isClosed bool) error {
+func (h *http) callAPI(conn net.Conn, pack *packet.Packet, api, remote string, isZlib bool, cac dpoCache, isClosed bool) error {
 	var (
 		resp    interface{}
 		errCode string
@@ -203,6 +299,8 @@ func (h *http) callAPI(conn net.Conn, pack *packet.Packet, api, remote string, i
 
 // sendResource 发送静态资源
 func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZlib bool, isClosed bool) error {
+	const resource = `resource`
+
 	if path == "" {
 		path = "index.html"
 	}
@@ -215,7 +313,7 @@ func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZ
 	pack.Reset()
 
 	// 加载静态资源(大数据)
-	if !env.config.AssetsCache || strings.HasPrefix(path, "resource") {
+	if !env.config.AssetsCache || strings.HasPrefix(path, resource) {
 		fd, err := os.Open(filepath.Join(assets, path))
 		if err != nil {
 			// 404
@@ -451,5 +549,55 @@ func (h *httpDpo) Parse(v interface{}) {
 	err := h.pack.DecodeJSON(v)
 	if err != nil {
 		Debug("http dpo parse data error: %v", err)
+	}
+}
+
+// createThirdPartDpo 创建处理对象
+func (h *http) createThirdPartDpo() *thirdHttpDpo {
+	return h.dpoThirdPartPool.Get().(*thirdHttpDpo)
+}
+
+// freeThirdPartDpo 释放处理对象
+func (h *http) freeThirdPartDpo(dpo *thirdHttpDpo) {
+	if dpo == nil {
+		return
+	}
+	dpo.pack = nil
+	dpo.release()
+	h.dpoThirdPartPool.Put(dpo)
+}
+
+// 第三方客户端处理参数
+type thirdHttpDpo struct {
+	baseDpo
+
+	pack *packet.Packet
+}
+
+// Parse 获取客户端参数
+func (h *thirdHttpDpo) Parse(v interface{}) {
+	if h.pack == nil {
+		return
+	}
+	switch h.pack.At(0) {
+	default:
+		// form
+		//v := reflect.ValueOf(v)
+		//for i := 0; i < v.NumField(); i++ {
+		//	f := v.Field(i)
+		//	f.Type().Name()
+		//}
+	case '{':
+		// json
+		err := h.pack.DecodeJSON(v)
+		if err != nil {
+			Debug("third-part dpo(json) parse data error: %v", err)
+		}
+	case '<':
+		// xml
+		err := xml.Unmarshal(h.pack.Data(), v)
+		if err != nil {
+			Debug("third-part dpo(xml) parse data error: %v", err)
+		}
 	}
 }

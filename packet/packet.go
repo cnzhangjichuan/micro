@@ -323,6 +323,14 @@ func (p *Packet) ReadWhen(dst byte) []byte {
 	return p.buf[st:p.r]
 }
 
+// At 指定位置的字符值
+func (p *Packet) At(i int) byte {
+	if i < p.r || i >= p.w {
+		return 0
+	}
+	return p.buf[i]
+}
+
 // Slice 指定位置的数据
 func (p *Packet) Slice(s, e int) []byte {
 	if e == -1 || e > p.w {
