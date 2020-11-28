@@ -86,6 +86,7 @@ func (o *Role) Decode(p *packet.Packet) {
 	o.Star = p.ReadI32()
 	o.Awaken = p.ReadI32()
 	o.Skl = p.ReadI32S()
+	o.Lock = p.ReadBool()
 }
 
 // Encode Role generate by codec.
@@ -96,6 +97,7 @@ func (o *Role) Encode(p *packet.Packet) {
 	p.WriteI32(o.Star)
 	p.WriteI32(o.Awaken)
 	p.WriteI32S(o.Skl)
+	p.WriteBool(o.Lock)
 }
 
 
@@ -107,6 +109,7 @@ func (o *Equip) Decode(p *packet.Packet) {
 	o.Star = p.ReadI32()
 	o.Refined = p.ReadI32()
 	o.Pis = p.ReadI32S()
+	o.Role = p.ReadString()
 }
 
 // Encode Equip generate by codec.
@@ -117,6 +120,7 @@ func (o *Equip) Encode(p *packet.Packet) {
 	p.WriteI32(o.Star)
 	p.WriteI32(o.Refined)
 	p.WriteI32S(o.Pis)
+	p.WriteString(o.Role)
 }
 
 

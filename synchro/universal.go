@@ -50,6 +50,7 @@ type Role struct {
 	Star   int32   // 星级
 	Awaken int32   // 觉醒次数
 	Skl    []int32 // 技能等级
+	Lock   bool    // 是否锁定
 }
 
 // SyncRole 同步角色
@@ -61,6 +62,7 @@ func (o *Universal) SyncRole(r *Role) {
 			o.Roles[i].Star = r.Star
 			o.Roles[i].Awaken = r.Awaken
 			o.Roles[i].Skl = r.Skl
+			o.Roles[i].Lock = r.Lock
 			return
 		}
 	}
@@ -75,6 +77,7 @@ type Equip struct {
 	Star    int32   // 星级
 	Refined int32   // 精练等级
 	Pis     []int32 // 拥有的属性值
+	Role    string  // 所属角色
 }
 
 // SyncEquip 同步装备
@@ -86,6 +89,7 @@ func (o *Universal) SyncEquip(eq *Equip) {
 			o.Equips[i].Star = eq.Star
 			o.Equips[i].Refined = eq.Refined
 			o.Equips[i].Pis = eq.Pis
+			o.Equips[i].Role = eq.Role
 			return
 		}
 	}
