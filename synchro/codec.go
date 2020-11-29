@@ -86,6 +86,7 @@ func (o *Role) Decode(p *packet.Packet) {
 	o.Star = p.ReadI32()
 	o.Awaken = p.ReadI32()
 	o.Skl = p.ReadI32S()
+	o.Combat = p.ReadI32()
 	o.Lock = p.ReadBool()
 }
 
@@ -97,6 +98,7 @@ func (o *Role) Encode(p *packet.Packet) {
 	p.WriteI32(o.Star)
 	p.WriteI32(o.Awaken)
 	p.WriteI32S(o.Skl)
+	p.WriteI32(o.Combat)
 	p.WriteBool(o.Lock)
 }
 

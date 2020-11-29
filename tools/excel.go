@@ -3,6 +3,7 @@ package tools
 import (
 	"errors"
 	"io"
+	"reflect"
 
 	"github.com/micro"
 	"github.com/micro/packet"
@@ -25,6 +26,53 @@ func ExcelReadFrom(name string, onSetup func(uint64), onReadRow func(*packet.Pac
 	onSetup(size)
 	for i := uint64(0); i < size; i++ {
 		onReadRow(pack, names, i)
+	}
+	packet.Free(pack)
+}
+
+// ExcelReadFrom 从文件中读取数据
+func ExcelAutoReadFrom(name string, onSetup func(uint64) interface{}) {
+	pack, err := packet.NewWithFile(name)
+	if err != nil {
+		micro.Errorf("load %s error: %v", name, err)
+		return
+	}
+
+	names := pack.ReadStrings()
+	size := pack.ReadU64()
+	arrayValue := reflect.ValueOf(onSetup(size))
+	for i := uint64(0); i < size; i++ {
+		value := arrayValue.Index(int(i))
+		for _, n := range names {
+			f := value.FieldByName(n)
+			switch f.Kind() {
+			case reflect.String:
+				f.SetString(pack.ReadString())
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				f.SetInt(pack.ReadI64())
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				f.SetUint(pack.ReadU64())
+			case reflect.Float32:
+				f.SetFloat(float64(pack.ReadF32()))
+			case reflect.Float64:
+				f.SetFloat(pack.ReadF64())
+			case reflect.Struct:
+				m := f.Addr().MethodByName("Parse")
+				if m.IsValid() {
+					m.Call([]reflect.Value{reflect.ValueOf(pack.ReadString())})
+				} else {
+					pack.ReadString()
+				}
+			case reflect.Ptr:
+				f.Set(reflect.New(f.Type().Elem()))
+				m := f.MethodByName("Parse")
+				if m.IsValid() {
+					m.Call([]reflect.Value{reflect.ValueOf(pack.ReadString())})
+				} else {
+					pack.ReadString()
+				}
+			}
+		}
 	}
 	packet.Free(pack)
 }
@@ -127,13 +175,11 @@ func excelWriteRow(pack *packet.Packet, row *xlsx.Row, types []string) {
 			pack.WriteString(v)
 		case "ignore":
 			// 忽略该列数据
-		case "float32", "float":
+		case "float", "float32":
 			pack.WriteF32(xutils.ParseF32(v, 0))
 		case "float64":
 			pack.WriteF64(xutils.ParseF64(v, 1))
-		case "int", "int32":
-			pack.WriteI32(xutils.ParseI32(v, 0))
-		case "int64":
+		case "int", "uint":
 			pack.WriteI64(xutils.ParseI64(v, 0))
 		}
 	}

@@ -12,155 +12,159 @@ type SI32 struct {
 }
 
 // 初始化
-func (mixed *SI32) Init(s string, i int32) {
-	if len(mixed.str) > 0 {
-		mixed.str = mixed.str[:1]
-		mixed.str[0] = s
-		mixed.i32 = mixed.i32[:1]
-		mixed.i32[0] = i
+func (s *SI32) Init(n string, i int32) {
+	if len(s.str) > 0 {
+		s.str = s.str[:1]
+		s.str[0] = n
+		s.i32 = s.i32[:1]
+		s.i32[0] = i
 	} else {
-		mixed.Add(s, i)
+		s.Add(n, i)
 	}
 }
 
 // Add 添加数据
-func (mixed *SI32) Add(s string, i int32) {
-	mixed.str = append(mixed.str, s)
-	mixed.i32 = append(mixed.i32, i)
+func (s *SI32) Add(n string, i int32) {
+	s.str = append(s.str, n)
+	s.i32 = append(s.i32, i)
 }
 
 // Merge 添加数据
-func (mixed *SI32) Merge(s string, i int32) {
-	for x := 0; x < len(mixed.str); x++ {
-		if mixed.str[x] == s {
-			mixed.i32[x] += i
+func (s *SI32) Merge(n string, i int32) {
+	for x := 0; x < len(s.str); x++ {
+		if s.str[x] == n {
+			s.i32[x] += i
 			return
 		}
 	}
-	mixed.Add(s, i)
+	s.Add(n, i)
 }
 
 // Parse 解析数据
-func (mixed *SI32) Parse(s string) {
+func (s *SI32) Parse(nv string) {
 	const def = 1
 
-	if s == "" {
-		mixed.str = make([]string, 0)
-		mixed.i32 = make([]int32, 0)
+	if nv == "" {
+		s.str = make([]string, 0)
+		s.i32 = make([]int32, 0)
 		return
 	}
 
-	if strings.Index(s, ";") >= 0 {
-		items := strings.Split(s, ";")
-		mixed.str = make([]string, len(items))
-		mixed.i32 = make([]int32, len(items))
+	if strings.Index(nv, ";") >= 0 {
+		items := strings.Split(nv, ";")
+		s.str = make([]string, len(items))
+		s.i32 = make([]int32, len(items))
 		for x, v := range items {
 			in := strings.Split(v, ",")
-			mixed.str[x] = in[0]
+			s.str[x] = in[0]
 			if len(in) < 2 {
-				mixed.i32 = append(mixed.i32, def)
+				s.i32 = append(s.i32, def)
 				continue
 			}
 			v, err := strconv.ParseInt(in[1], 10, 32)
 			if err != nil {
-				mixed.i32 = append(mixed.i32, def)
+				s.i32[x] = def
 			} else {
-				mixed.i32 = append(mixed.i32, int32(v))
+				s.i32[x] = int32(v)
 			}
 		}
 	} else {
-		items := strings.Split(s, ",")
+		items := strings.Split(nv, ",")
 		l := len(items)
-		mixed.str = make([]string, 0, l)
-		mixed.i32 = make([]int32, 0, l)
+		s.str = make([]string, 0, l)
+		s.i32 = make([]int32, 0, l)
 		i := 0
 		for i < l {
-			mixed.str = append(mixed.str, items[i])
+			s.str = append(s.str, items[i])
 			i += 1
 			if i >= l {
-				mixed.i32 = append(mixed.i32, def)
+				s.i32 = append(s.i32, def)
 				break
 			}
 			v, err := strconv.ParseInt(items[i], 10, 32)
 			if err != nil {
-				mixed.i32 = append(mixed.i32, def)
+				s.i32 = append(s.i32, def)
 				continue
 			}
 			i += 1
-			mixed.i32 = append(mixed.i32, int32(v))
+			s.i32 = append(s.i32, int32(v))
 		}
 	}
 }
 
 // Append 解析数据
-func (mixed *SI32) Append(s string) {
+func (s *SI32) Append(nv string) {
 	const def = 1
 
-	if s == "" {
+	if nv == "" {
 		return
 	}
-	if strings.Index(s, ";") >= 0 {
-		items := strings.Split(s, ";")
+
+	// split by ';'
+	if strings.Index(nv, ";") >= 0 {
+		items := strings.Split(nv, ";")
 		for _, v := range items {
 			in := strings.Split(v, ",")
-			mixed.str = append(mixed.str, in[0])
+			s.str = append(s.str, in[0])
 			if len(in) < 2 {
-				mixed.i32 = append(mixed.i32, def)
+				s.i32 = append(s.i32, def)
 				continue
 			}
 			v, err := strconv.ParseInt(in[1], 10, 32)
 			if err != nil {
-				mixed.i32 = append(mixed.i32, def)
+				s.i32 = append(s.i32, def)
 			} else {
-				mixed.i32 = append(mixed.i32, int32(v))
+				s.i32 = append(s.i32, int32(v))
 			}
 		}
-	} else {
-		items := strings.Split(s, ",")
-		i := 0
-		for i < len(items) {
-			mixed.str = append(mixed.str, items[i])
-			i += 1
-			if i >= len(items) {
-				mixed.i32 = append(mixed.i32, def)
-				break
-			}
-			v, err := strconv.ParseInt(items[i], 10, 32)
-			if err != nil {
-				mixed.i32 = append(mixed.i32, def)
-				continue
-			}
-			i += 1
-			mixed.i32 = append(mixed.i32, int32(v))
+		return
+	}
+
+	// split by ','
+	items := strings.Split(nv, ",")
+	i := 0
+	for i < len(items) {
+		s.str = append(s.str, items[i])
+		i += 1
+		if i >= len(items) {
+			s.i32 = append(s.i32, def)
+			break
 		}
+		v, err := strconv.ParseInt(items[i], 10, 32)
+		if err != nil {
+			s.i32 = append(s.i32, def)
+			continue
+		}
+		i += 1
+		s.i32 = append(s.i32, int32(v))
 	}
 }
 
 // Len 获取数据长度
-func (mixed *SI32) Len() int {
-	return len(mixed.str)
+func (s *SI32) Len() int {
+	return len(s.str)
 }
 
 // Get 获取指定位置的数据
-func (mixed *SI32) Get(x int) (string, int32) {
-	if x < 0 || x >= len(mixed.str) {
+func (s *SI32) Get(x int) (string, int32) {
+	if x < 0 || x >= len(s.str) {
 		return "", 0
 	}
-	return mixed.str[x], mixed.i32[x]
+	return s.str[x], s.i32[x]
 }
 
 // Set 设置指定位置的数据
-func (mixed *SI32) Set(x int, v int32) {
-	if len(mixed.i32) > x {
-		mixed.i32[x] = v
+func (s *SI32) Set(x int, v int32) {
+	if 0 <= x && x < len(s.i32) {
+		s.i32[x] = v
 	}
 }
 
 // GetValue 获取指定名称的值
-func (mixed *SI32) GetValue(name string) int32 {
-	for i, n := range mixed.str {
+func (s *SI32) GetValue(name string) int32 {
+	for i, n := range s.str {
 		if n == name {
-			return mixed.i32[i]
+			return s.i32[i]
 		}
 	}
 	return 0
@@ -173,85 +177,85 @@ type SF32 struct {
 }
 
 // Add 添加数据
-func (mixed *SF32) Add(s string, f float32) {
-	mixed.str = append(mixed.str, s)
-	mixed.f32 = append(mixed.f32, f)
+func (s *SF32) Add(n string, f float32) {
+	s.str = append(s.str, n)
+	s.f32 = append(s.f32, f)
 }
 
 // Parse 解析数据
-func (mixed *SF32) Parse(s string) {
-	if s == "" {
-		mixed.str = make([]string, 0)
-		mixed.f32 = make([]float32, 0)
+func (s *SF32) Parse(nv string) {
+	if nv == "" {
+		s.str = make([]string, 0)
+		s.f32 = make([]float32, 0)
 		return
 	}
 
-	if strings.Index(s, ";") >= 0 {
-		items := strings.Split(s, ";")
-		mixed.str = make([]string, len(items))
-		mixed.f32 = make([]float32, len(items))
+	if strings.Index(nv, ";") >= 0 {
+		items := strings.Split(nv, ";")
+		s.str = make([]string, len(items))
+		s.f32 = make([]float32, len(items))
 		for x, v := range items {
 			in := strings.Split(v, ",")
-			mixed.str[x] = in[0]
+			s.str[x] = in[0]
 			if len(in) < 2 {
-				mixed.f32[x] = 0
+				s.f32[x] = 0
 				continue
 			}
 			if v, err := strconv.ParseFloat(in[1], 32); err != nil {
-				mixed.f32[x] = 0
+				s.f32[x] = 0
 			} else {
-				mixed.f32[x] = float32(v)
+				s.f32[x] = float32(v)
 			}
 		}
 	} else {
-		items := strings.Split(s, ",")
+		items := strings.Split(nv, ",")
 		l := len(items)
-		mixed.str = make([]string, 0, l)
-		mixed.f32 = make([]float32, 0, l)
+		s.str = make([]string, 0, l)
+		s.f32 = make([]float32, 0, l)
 		i := 0
 		for i < l {
-			mixed.str = append(mixed.str, items[i])
+			s.str = append(s.str, items[i])
 			i += 1
 			if i >= l {
-				mixed.f32 = append(mixed.f32, 0)
+				s.f32 = append(s.f32, 0)
 				break
 			}
 			v, err := strconv.ParseFloat(items[i], 32)
 			if err != nil {
-				mixed.f32 = append(mixed.f32, 0)
+				s.f32 = append(s.f32, 0)
 				continue
 			}
 			i += 1
-			mixed.f32 = append(mixed.f32, float32(v))
+			s.f32 = append(s.f32, float32(v))
 		}
 	}
 }
 
 // Len 获取数据长度
-func (mixed *SF32) Len() int {
-	return len(mixed.str)
+func (s *SF32) Len() int {
+	return len(s.str)
 }
 
 // Get 获取指定位置的数据
-func (mixed *SF32) Get(x int) (string, float32) {
-	if x < 0 || x >= len(mixed.str) {
+func (s *SF32) Get(x int) (string, float32) {
+	if x < 0 || x >= len(s.str) {
 		return "", 0
 	}
-	return mixed.str[x], mixed.f32[x]
+	return s.str[x], s.f32[x]
 }
 
 // Set 设置指定位置的数据
-func (mixed *SF32) Set(x int, v float32) {
-	if len(mixed.f32) > x {
-		mixed.f32[x] = v
+func (s *SF32) Set(x int, v float32) {
+	if 0 <= x && x < len(s.f32) {
+		s.f32[x] = v
 	}
 }
 
 // GetValue 获取指定名称的值
-func (mixed *SF32) GetValue(name string) float32 {
-	for i, n := range mixed.str {
+func (s *SF32) GetValue(name string) float32 {
+	for i, n := range s.str {
 		if n == name {
-			return mixed.f32[i]
+			return s.f32[i]
 		}
 	}
 	return 0
@@ -264,95 +268,130 @@ type I32F32 struct {
 }
 
 // Add 添加数据
-func (mixed *I32F32) Add(i int32, f float32) {
-	mixed.i32 = append(mixed.i32, i)
-	mixed.f32 = append(mixed.f32, f)
+func (s *I32F32) Add(i int32, f float32) {
+	s.i32 = append(s.i32, i)
+	s.f32 = append(s.f32, f)
 }
 
 // Parse 解析数据
-func (mixed *I32F32) Parse(s string) {
-	if s == "" {
-		mixed.i32 = make([]int32, 0)
-		mixed.f32 = make([]float32, 0)
+func (s *I32F32) Parse(nv string) {
+	if nv == "" {
+		s.i32 = make([]int32, 0)
+		s.f32 = make([]float32, 0)
 		return
 	}
-	if strings.Index(s, ";") >= 0 {
-		items := strings.Split(s, ";")
-		mixed.i32 = make([]int32, len(items))
-		mixed.f32 = make([]float32, len(items))
+	if strings.Index(nv, ";") >= 0 {
+		items := strings.Split(nv, ";")
+		s.i32 = make([]int32, len(items))
+		s.f32 = make([]float32, len(items))
 		for x, v := range items {
 			in := strings.Split(v, ",")
 			iv, err := strconv.ParseInt(in[0], 10, 32)
 			if err != nil {
-				mixed.i32[x] = 0
+				s.i32[x] = 0
 			} else {
-				mixed.i32[x] = int32(iv)
+				s.i32[x] = int32(iv)
 			}
 			if len(in) < 2 {
-				mixed.f32[x] = 0
+				s.f32[x] = 0
 				continue
 			}
 			fv, err := strconv.ParseFloat(in[1], 32)
 			if err != nil {
-				mixed.f32[x] = 0
+				s.f32[x] = 0
 			} else {
-				mixed.f32[x] = float32(fv)
+				s.f32[x] = float32(fv)
 			}
 		}
 	} else {
-		items := strings.Split(s, ",")
+		items := strings.Split(nv, ",")
 		l := len(items) / 2
-		mixed.i32 = make([]int32, 0, l)
-		mixed.f32 = make([]float32, 0, l)
+		s.i32 = make([]int32, 0, l)
+		s.f32 = make([]float32, 0, l)
 		for i := 1; i < len(items); i += 2 {
 			iv, err := strconv.ParseInt(items[i-1], 10, 32)
 			if err != nil {
-				mixed.i32 = append(mixed.i32, 0)
+				s.i32 = append(s.i32, 0)
 			} else {
-				mixed.i32 = append(mixed.i32, int32(iv))
+				s.i32 = append(s.i32, int32(iv))
 			}
 			fv, err := strconv.ParseFloat(items[i], 32)
 			if err != nil {
-				mixed.f32 = append(mixed.f32, 0)
+				s.f32 = append(s.f32, 0)
 			} else {
-				mixed.f32 = append(mixed.f32, float32(fv))
+				s.f32 = append(s.f32, float32(fv))
 			}
 		}
 	}
 }
 
 // Len 获取数据长度
-func (mixed *I32F32) Len() int {
-	return len(mixed.i32)
+func (s *I32F32) Len() int {
+	return len(s.i32)
 }
 
 // Get 获取指定位置的数据
-func (mixed *I32F32) Get(x int) (int32, float32) {
-	if x < 0 || x >= len(mixed.i32) {
+func (s *I32F32) Get(x int) (int32, float32) {
+	if x < 0 || x >= len(s.i32) {
 		return 0, 0
 	}
-	return mixed.i32[x], mixed.f32[x]
+	return s.i32[x], s.f32[x]
 }
 
 // GetRate 获取指定次数的概率
 // times 从1次开始
-func (t *I32F32) GetTimesRate(times int32) float32 {
+func (s *I32F32) GetTimesRate(times int32) float32 {
 	// 没有找到匹配项
 	// 取最接近的数据返回
 	var (
 		retTimes = int32(0)
 		retRate  float32
 	)
-	for i, ts := range t.i32 {
+	for i, ts := range s.i32 {
 		if times == ts {
-			return t.f32[i]
+			return s.f32[i]
 		}
 		if times > ts {
-			rt, rr := ts, t.f32[i]
+			rt, rr := ts, s.f32[i]
 			if rt > retTimes {
 				retTimes, retRate = rt, rr
 			}
 		}
 	}
 	return retRate
+}
+
+// Growth 成长值
+type Growth struct {
+	f32 []float32
+}
+
+// Parse 解析数据
+func (s *Growth) Parse(nv string) {
+	var items []string
+	if strings.Index(nv, ";") >= 0 {
+		items = strings.Split(nv, ";")
+	} else {
+		items = strings.Split(nv, ",")
+	}
+	s.f32 = make([]float32, len(items))
+	for i := 0; i < len(items); i++ {
+		f64, err := strconv.ParseFloat(items[i], 32)
+		if err != nil {
+			f64 = 1
+		}
+		f32 := float32(f64)
+		if i > 0 {
+			f32 *= s.f32[i-1]
+		}
+		s.f32[i] = f32
+	}
+}
+
+// Get 获取指定位置的数据
+func (s *Growth) Get(x int32) float32 {
+	if x < 0 || x >= int32(len(s.f32)) {
+		return 1
+	}
+	return s.f32[x]
 }

@@ -50,6 +50,7 @@ type Role struct {
 	Star   int32   // 星级
 	Awaken int32   // 觉醒次数
 	Skl    []int32 // 技能等级
+	Combat int32   // 战斗力
 	Lock   bool    // 是否锁定
 }
 
