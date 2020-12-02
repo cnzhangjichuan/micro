@@ -147,7 +147,11 @@ func (r *Rankings) GetNearWindow(leftCount, rightCount, step int) []int32 {
 }
 
 // GetNears 加载与自身相邻的榜单数据
-func (r *Rankings) GetNears(id string, window []int32, top int) (ret *RankingResult) {
+// id 自身ID
+// window 查找的窗口范围
+// top 加载前几名
+// mine 是否包含自已
+func (r *Rankings) GetNears(id string, window []int32, top int, mine bool) (ret *RankingResult) {
 	ret = &RankingResult{}
 
 	// 查找自身所在的索引位置
@@ -161,8 +165,20 @@ func (r *Rankings) GetNears(id string, window []int32, top int) (ret *RankingRes
 	// 装载数据
 	ids := r.calNearCoordinate(window, cdx, top)
 	r.RLock()
+	skip := false
 	for _, i := range ids {
+		if !mine && i == cdx {
+			skip = true
+			continue
+		}
 		r.loadRankingItem(ret, pack, i)
+	}
+	if skip && len(ids) > 0 {
+		// 由于跳过自身的数据，结果中少一个，在这里补上
+		last := ids[len(ids)-1] + 1
+		if last < len(r.items) {
+			r.loadRankingItem(ret, pack, last)
+		}
 	}
 	r.RUnlock()
 
@@ -172,7 +188,7 @@ func (r *Rankings) GetNears(id string, window []int32, top int) (ret *RankingRes
 }
 
 // Update 更新数据
-func (r *Rankings) Update(item RankingItem) (rank, delta int32) {
+func (r *Rankings) Update(item RankingItem, synchro func([]int32), synchroIds []string) (rank, delta int32) {
 	var (
 		idx   = -1
 		rid   string
@@ -187,6 +203,20 @@ func (r *Rankings) Update(item RankingItem) (rank, delta int32) {
 	}
 
 	r.Lock()
+
+	// 同步一次排行榜值
+	if synchro != nil && len(synchroIds) > 0 {
+		vs := make([]int32, len(synchroIds))
+		for i := 0; i < len(vs); i++ {
+			idx := r.findIndex(synchroIds[i])
+			if idx >= 0 {
+				vs[i] = r.items[idx].Value
+			} else {
+				vs[i] = -1
+			}
+		}
+		synchro(vs)
+	}
 
 	// 如果在榜中, 直接更新榜中数据
 	for i := 0; i < len(r.items); i++ {
@@ -300,7 +330,7 @@ func (r *Rankings) swap(i, j int) {
 func (r *Rankings) Save() {
 	const (
 		initCacheSize = 4096
-		buffItemSize = 1024
+		buffItemSize  = 1024
 	)
 
 	if r.saver == nil && r.edCreate != nil {
