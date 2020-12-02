@@ -188,7 +188,42 @@ func (r *Rankings) GetNears(id string, window []int32, top int, mine bool) (ret 
 }
 
 // Update 更新数据
-func (r *Rankings) Update(item RankingItem, synchro func([]int32), synchroIds []string) (rank, delta int32) {
+func (r *Rankings) Update(item RankingItem) (rank, delta int32) {
+	r.Lock()
+	rank, delta = r.update(item)
+	r.Unlock()
+	return
+}
+
+// UpdateTwo 更新数据
+func (r *Rankings) UpdateTwo(mine, opp RankingItem, syncFunc func(int32, int32)) (mineRank, mineDelta, oppRank, oppDelta int32) {
+	r.Lock()
+	if syncFunc != nil {
+		var (
+			mv int32
+			ov int32
+		)
+		mdx := r.findIndex(mine.GetID())
+		if mdx >= 0 {
+			mv = r.items[mdx].Value
+		} else {
+			mv = mine.GetValue()
+		}
+		odx := r.findIndex(opp.GetID())
+		if odx >= 0 {
+			ov = r.items[odx].Value
+		} else {
+			ov = opp.GetValue()
+		}
+		syncFunc(mv, ov)
+	}
+	mineRank, mineDelta = r.update(mine)
+	oppRank, oppDelta = r.update(opp)
+	r.Unlock()
+	return
+}
+
+func (r *Rankings) update(item RankingItem) (rank, delta int32) {
 	var (
 		idx   = -1
 		rid   string
@@ -200,22 +235,6 @@ func (r *Rankings) Update(item RankingItem, synchro func([]int32), synchroIds []
 	if id == "" {
 		rank, delta = -1, 0
 		return
-	}
-
-	r.Lock()
-
-	// 同步一次排行榜值
-	if synchro != nil && len(synchroIds) > 0 {
-		vs := make([]int32, len(synchroIds))
-		for i := 0; i < len(vs); i++ {
-			idx := r.findIndex(synchroIds[i])
-			if idx >= 0 {
-				vs[i] = r.items[idx].Value
-			} else {
-				vs[i] = -1
-			}
-		}
-		synchro(vs)
 	}
 
 	// 如果在榜中, 直接更新榜中数据
@@ -231,7 +250,6 @@ func (r *Rankings) Update(item RankingItem, synchro func([]int32), synchroIds []
 			rank = oRank
 			if r.items[i].Value == item.GetValue() {
 				r.updateItem(i, item)
-				r.Unlock()
 				delta = 0
 				return
 			}
@@ -243,7 +261,6 @@ func (r *Rankings) Update(item RankingItem, synchro func([]int32), synchroIds []
 	if idx == -1 {
 		if item.GetValue() <= r.items[len(r.items)-1].Value {
 			// 未上榜
-			r.Unlock()
 			rank, delta = -1, 0
 			return
 		}
@@ -277,7 +294,6 @@ func (r *Rankings) Update(item RankingItem, synchro func([]int32), synchroIds []
 		}
 	}
 
-	r.Unlock()
 	delta = oRank - rank
 	return
 }
