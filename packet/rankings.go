@@ -35,6 +35,7 @@ type RankingItem interface {
 	GetID() string
 	GetValue() int32
 	SetRank(int32)
+	GetRank() int32
 }
 
 // SingleSaver 数据加载器
