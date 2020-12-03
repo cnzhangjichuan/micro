@@ -187,6 +187,20 @@ func (r *Rankings) GetNears(id string, window []int32, top int, mine bool) (ret 
 	return
 }
 
+// AddRobot 添加机器人
+func (r *Rankings) AddRobot(item RankingItem) (rank int32) {
+	r.Lock()
+	i := r.findIndex(item.GetID())
+	if i >= 0 {
+		rank = r.items[i].Rank
+		r.Unlock()
+		return
+	}
+	rank, _ = r.update(item)
+	r.Unlock()
+	return
+}
+
 // Update 更新数据
 func (r *Rankings) Update(item RankingItem) (rank, delta int32) {
 	r.Lock()

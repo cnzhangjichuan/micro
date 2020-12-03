@@ -50,7 +50,11 @@ func ParseBytes(s string) (ret []byte) {
 	if s == "" {
 		return
 	}
-	ss := strings.Split(s, ";")
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	}
+	ss := strings.Split(s, sep)
 	sl := len(ss)
 	ret = make([]byte, sl)
 	for i := 0; i < sl; i++ {
@@ -73,7 +77,11 @@ func ParseI32S(s string) (ret []int32) {
 	if s == "" {
 		return
 	}
-	ss := strings.Split(s, ";")
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	}
+	ss := strings.Split(s, sep)
 	sl := len(ss)
 	ret = make([]int32, sl)
 	for i := 0; i < sl; i++ {
@@ -96,7 +104,11 @@ func ParseI64S(s string) (ret []int64) {
 	if s == "" {
 		return
 	}
-	ss := strings.Split(s, ";")
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	}
+	ss := strings.Split(s, sep)
 	sl := len(ss)
 	ret = make([]int64, sl)
 	for i := 0; i < sl; i++ {
@@ -119,7 +131,11 @@ func ParseU32S(s string) (ret []uint32) {
 	if s == "" {
 		return
 	}
-	ss := strings.Split(s, ";")
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	}
+	ss := strings.Split(s, sep)
 	sl := len(ss)
 	ret = make([]uint32, sl)
 	for i := 0; i < sl; i++ {
@@ -142,7 +158,11 @@ func ParseU64S(s string) (ret []uint64) {
 	if s == "" {
 		return
 	}
-	ss := strings.Split(s, ";")
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	}
+	ss := strings.Split(s, sep)
 	sl := len(ss)
 	ret = make([]uint64, sl)
 	for i := 0; i < sl; i++ {
@@ -165,7 +185,11 @@ func ParseF32S(s string) (ret []float32) {
 	if s == "" {
 		return
 	}
-	ss := strings.Split(s, ";")
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	}
+	ss := strings.Split(s, sep)
 	sl := len(ss)
 	ret = make([]float32, sl)
 	for i := 0; i < sl; i++ {
@@ -188,7 +212,11 @@ func ParseF64S(s string) (ret []float64) {
 	if s == "" {
 		return
 	}
-	ss := strings.Split(s, ";")
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	}
+	ss := strings.Split(s, sep)
 	sl := len(ss)
 	ret = make([]float64, sl)
 	for i := 0; i < sl; i++ {
@@ -208,7 +236,11 @@ func ParseBools(s string) (ret []bool) {
 	if s == "" {
 		return
 	}
-	ss := strings.Split(s, ";")
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	}
+	ss := strings.Split(s, sep)
 	sl := len(ss)
 	ret = make([]bool, sl)
 	for i := 0; i < sl; i++ {

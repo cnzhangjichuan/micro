@@ -88,6 +88,11 @@ type baseDpo struct {
 }
 
 // LoadUser 加载用户数据
+func LoadUser(u packet.Identifier, uid string) bool {
+	return env.userCache.Load(u, uid)
+}
+
+// LoadUser 加载用户数据
 func (b *baseDpo) LoadUser(u packet.Identifier) bool {
 	uid := u.GetUID()
 	if uid == "" {
@@ -96,7 +101,7 @@ func (b *baseDpo) LoadUser(u packet.Identifier) bool {
 	if uid == "" {
 		return false
 	}
-	return env.userCache.Load(u, uid)
+	return LoadUser(u, uid)
 }
 
 // SetUser 设置用户数据
