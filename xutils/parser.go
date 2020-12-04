@@ -278,6 +278,19 @@ func EqualStrings(s1, s2 []string) bool {
 	return true
 }
 
+// EqualF32 数组值是否相等
+func EqualF32(s1, s2 []float32) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+	for i, v := range s1 {
+		if s2[i] != v {
+			return false
+		}
+	}
+	return true
+}
+
 // HasU32 是否含有指定元素
 func HasU32(arr []uint32, item uint32) bool {
 	al := len(arr)
