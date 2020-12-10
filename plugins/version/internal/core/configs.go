@@ -15,7 +15,7 @@ import (
 const root = `./assets/resource/versions`
 
 // Service 初始化版本服务
-func (v *Service) Init(rootUrl string) {
+func (s *Service) Init(rootUrl string) {
 	// 文件下载地址
 	if rootUrl == "" {
 		rootUrl = "http://127.0.0.1:9000/resource/versions"
@@ -23,33 +23,33 @@ func (v *Service) Init(rootUrl string) {
 	if !strings.HasSuffix(rootUrl, "/") {
 		rootUrl += "/"
 	}
-	v.rootUrl = rootUrl
+	s.rootUrl = rootUrl
 
 	// 加载版本文件
 	os.MkdirAll(root, os.ModePerm)
-	v.files = make([]versionFile, 0, 32)
-	v.reloadVersionFiles()
+	s.files = make([]versionFile, 0, 32)
+	s.reloadVersionFiles()
 }
 
 // reloadVersionFiles 加载版本文件列表
-func (v *Service) reloadVersionFiles() {
+func (s *Service) reloadVersionFiles() {
 	fs, err := ioutil.ReadDir(root)
 	if err != nil {
 		micro.Debug("read version files error", err)
 		return
 	}
-	v.files = v.files[:0]
+	s.files = s.files[:0]
 	for _, f := range fs {
-		v.files = append(v.files, versionFile{
-			Code: v.getNameWithoutExt(f.Name()),
+		s.files = append(s.files, versionFile{
+			Code: s.getNameWithoutExt(f.Name()),
 			Size: uint64(f.Size()),
-			MD5:  v.getFileMD5(filepath.Join(root, f.Name())),
+			MD5:  s.getFileMD5(filepath.Join(root, f.Name())),
 		})
 	}
 }
 
 // getNameWithoutExt 获取文件名称(不包括扩展名)
-func (v *Service) getNameWithoutExt(fileName string) string {
+func (s *Service) getNameWithoutExt(fileName string) string {
 	for i := len(fileName) - 1; i >= 0; i-- {
 		if fileName[i] == '.' {
 			return fileName[:i]
@@ -59,7 +59,7 @@ func (v *Service) getNameWithoutExt(fileName string) string {
 }
 
 // getFileMD5 获取文件的MD5值
-func (v *Service) getFileMD5(fileName string) string {
+func (s *Service) getFileMD5(fileName string) string {
 	fd, err := os.Open(fileName)
 	if err != nil {
 		return ""

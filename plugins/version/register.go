@@ -24,3 +24,9 @@ func Register(rootUrl string) {
 	// 文件上传
 	micro.RegisterUploadFunc(api, srv.UploadFile)
 }
+
+// Difference 比对文件
+func Difference(dst string, only []string, sVersion bool) error {
+	var srv core.Service
+	return srv.Difference(dst, only, sVersion)
+}

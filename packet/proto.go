@@ -36,8 +36,8 @@ func (p *Packet) WriteStrings(ss []string) {
 // ReadString 读出字符串数组
 func (p *Packet) ReadString() string {
 	// read header size
-	n, _ := binary.ReadVarint(p)
-	if n <= 0 {
+	n, err := binary.ReadVarint(p)
+	if err != nil || n <= 0 {
 		return ""
 	}
 

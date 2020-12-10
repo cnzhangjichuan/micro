@@ -11,7 +11,7 @@ import (
 )
 
 // CheckVersion 校验版本号
-func (v *Service) CheckVersion(dpo micro.Dpo) (interface{}, string) {
+func (s *Service) CheckVersion(dpo micro.Dpo) (interface{}, string) {
 	var (
 		resp = make([]RespVersion, 0, 8)
 		req  ReqVersion
@@ -26,31 +26,31 @@ func (v *Service) CheckVersion(dpo micro.Dpo) (interface{}, string) {
 	}
 
 	// 将版本号大于传入版本号的文件加入列表中
-	v.RLock()
-	for i := 0; i < len(v.files); i++ {
-		if v.files[i].Code > req.Code {
+	s.RLock()
+	for i := 0; i < len(s.files); i++ {
+		if s.files[i].Code > req.Code {
 			resp = append(resp, RespVersion{
-				Code: v.files[i].Code,
-				Size: v.files[i].Size,
-				MD5:  v.files[i].MD5,
-				Url:  v.rootUrl + v.files[i].Code + ".zip",
+				Code: s.files[i].Code,
+				Size: s.files[i].Size,
+				MD5:  s.files[i].MD5,
+				Url:  s.rootUrl + s.files[i].Code + ".zip",
 			})
 		}
 	}
-	v.RUnlock()
+	s.RUnlock()
 
 	return &resp, ""
 }
 
 // UploadFile 上传版本文件
-func (v *Service) UploadFile(reader io.Reader) error {
-	v.Lock()
+func (s *Service) UploadFile(reader io.Reader) error {
+	s.Lock()
 
 	// save file
 	fileName := time.Now().Format("20060102150405")
 	fd, err := os.Create(filepath.Join(root, fileName+".zip"))
 	if err != nil {
-		v.Unlock()
+		s.Unlock()
 		return err
 	}
 
@@ -60,8 +60,8 @@ func (v *Service) UploadFile(reader io.Reader) error {
 	fd.Close()
 
 	// reload version files.
-	v.reloadVersionFiles()
-	v.Unlock()
+	s.reloadVersionFiles()
+	s.Unlock()
 	if err == io.EOF {
 		return nil
 	}
@@ -69,8 +69,8 @@ func (v *Service) UploadFile(reader io.Reader) error {
 }
 
 // reloadVersionFiles 重新加载文件配置
-func (v *Service) ReloadVersionFiles() {
-	v.Lock()
-	v.reloadVersionFiles()
-	v.Unlock()
+func (s *Service) ReloadVersionFiles() {
+	s.Lock()
+	s.reloadVersionFiles()
+	s.Unlock()
 }

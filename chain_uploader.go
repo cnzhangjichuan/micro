@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/micro/packet"
@@ -23,7 +24,6 @@ func (c *uploader) Handle(conn net.Conn, name string, pack *packet.Packet) bool 
 	}
 
 	auc := pack.HTTPHeaderValue(httpAuthorize)
-	n := xutils.ParseI64(pack.HTTPHeaderValue(httpContentLength), 0)
 
 	// authorize check
 	api, ok := env.authorize.Check(auc)
@@ -40,26 +40,28 @@ func (c *uploader) Handle(conn net.Conn, name string, pack *packet.Packet) bool 
 	f, ok := env.uploadFunc[api]
 	if !ok {
 		pack.BeginWrite()
-		pack.WriteU32(0)
 		pack.WriteString("not found api")
 		pack.EndWrite()
 		pack.FlushToConn(conn)
 		return true
 	}
 
-	// 通知远端，开始上传文件
-	pack.BeginWrite()
-	pack.WriteU32(1)
-	pack.EndWrite()
-	pack.FlushToConn(conn)
+	// 接收body体
+	if err := pack.ReadHTTPBodyStream(conn); err != nil {
+		pack.BeginWrite()
+		pack.WriteString("invalid body data")
+		pack.EndWrite()
+		pack.FlushToConn(conn)
+		return true
+	}
 
-	// 开始接收数据
-	err := f(io.LimitReader(conn, n))
+	// 开始处理数据
+	err := f(pack)
 	pack.BeginWrite()
 	if err != nil {
 		pack.WriteString("upload file error:" + err.Error())
 	} else {
-		pack.WriteString(`file has been uploaded.`)
+		pack.WriteString(`file has been uploaded`)
 	}
 	pack.EndWrite()
 	pack.FlushToConn(conn)
@@ -105,6 +107,12 @@ func requestUploadService(api, fileName, remoteAddress string) error {
 	if err != nil {
 		return err
 	}
+	// 解析路径
+	var path string
+	if i := strings.Index(remoteAddress, "/"); i > 0 {
+		path = remoteAddress[i:]
+		remoteAddress = remoteAddress[:i]
+	}
 	conn, err := net.DialTimeout("tcp", remoteAddress, time.Second)
 	if err != nil {
 		fd.Close()
@@ -114,6 +122,12 @@ func requestUploadService(api, fileName, remoteAddress string) error {
 	pack := packet.New(1024)
 
 	// 发送请求
+	if path != "" {
+		pack.Write([]byte(`GET `+path+` HTTP/1.1`))
+		pack.Write(httpRowAt)
+		pack.Write([]byte(`Host: `+remoteAddress))
+		pack.Write(httpRowAt)
+	}
 	pack.Write([]byte("Upgrade: uploader"))
 	pack.Write(httpRowAt)
 	// check code
@@ -132,22 +146,6 @@ func requestUploadService(api, fileName, remoteAddress string) error {
 		fd.Close()
 		conn.Close()
 		return errors.New("signal couldn't be sent. service may be closed")
-	}
-
-	// 接收确认信息
-	err = pack.ReadConn(conn)
-	if err != nil {
-		packet.Free(pack)
-		fd.Close()
-		conn.Close()
-		return errors.New("signal ok couldn't be recv. service may be closed")
-	}
-	if pack.ReadU32() != 1 {
-		err = errors.New(pack.ReadString())
-		packet.Free(pack)
-		fd.Close()
-		conn.Close()
-		return err
 	}
 
 	// 开始发送数据

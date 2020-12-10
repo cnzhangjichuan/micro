@@ -227,8 +227,7 @@ func (p *Packet) Unescape(s []byte) int {
 	return cx
 }
 
-// ReadHTTPBody 从网络中读取http格式的数据(body)
-func (p *Packet) ReadHTTPBody(conn net.Conn) (err error) {
+func (p *Packet) ReadHTTPBodyStream(conn net.Conn) (err error) {
 	var bodySize int
 	if i, er := strconv.Atoi(p.HTTPHeaderValue(httpHeadContentLength)); er == nil {
 		bodySize = i
@@ -260,6 +259,12 @@ func (p *Packet) ReadHTTPBody(conn net.Conn) (err error) {
 		}
 	}
 	_, err = io.ReadFull(conn, p.Allocate(bodySize-p.w))
+	return err
+}
+
+// ReadHTTPBody 从网络中读取http格式的数据(body)
+func (p *Packet) ReadHTTPBody(conn net.Conn) (err error) {
+	err = p.ReadHTTPBodyStream(conn)
 	if err == nil {
 		p.w = p.Unescape(p.buf[:p.w])
 	}
