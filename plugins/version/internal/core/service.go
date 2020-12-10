@@ -138,12 +138,15 @@ func (s *Service) processFile(f os.FileInfo, cur string, ps int, tpx string, fil
 		if err != nil {
 			return false, err
 		}
+		upd := false
 		for _, c := range fs {
 			if ok, err := s.processFile(c, dr, ps, tpx, fileMD5); err != nil {
 				return ok, err
+			} else if ok {
+				upd = true
 			}
 		}
-		return false, nil
+		return upd, nil
 	}
 
 	// 处理文件
