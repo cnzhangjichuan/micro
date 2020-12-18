@@ -73,6 +73,10 @@ func (s *Service) Difference(dst string, only []string, sVersion bool) error {
 	}
 
 	// 将临时文件打包
+	if _, err := os.Stat(tpx); err != nil {
+		// 差异文件不存在
+		return nil
+	}
 	pdf, err := os.Create(versionPacket)
 	if err != nil {
 		return err
