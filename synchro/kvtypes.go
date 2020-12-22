@@ -170,16 +170,53 @@ func (s *SI32) GetValue(name string) int32 {
 	return 0
 }
 
+// Reset 重置
+func (s *SI32) Reset() {
+	if len(s.str) > 0 {
+		s.str = s.str[:0]
+	}
+	if len(s.i32) > 0 {
+		s.i32 = s.i32[:0]
+	}
+}
+
 // SF32 string/float32值对
 type SF32 struct {
 	str []string
 	f32 []float32
 }
 
+// Merge 添加数据
+func (s *SF32) Merge(n string, f float32) {
+	for x := 0; x < len(s.str); x++ {
+		if s.str[x] == n {
+			s.f32[x] += f
+			return
+		}
+	}
+	s.Add(n, f)
+}
+
+// MergeAll 添加数据
+func (s *SF32) MergeAll(f *SF32) {
+	for x := 0; x < f.Len(); x++ {
+		n, v := f.Get(x)
+		s.Merge(n, v)
+	}
+}
+
 // Add 添加数据
 func (s *SF32) Add(n string, f float32) {
 	s.str = append(s.str, n)
 	s.f32 = append(s.f32, f)
+}
+
+// AddAll 添加数据
+func (s *SF32) AddAll(f *SF32) {
+	for x := 0; x < f.Len(); x++ {
+		n, v := f.Get(x)
+		s.Add(n, v)
+	}
 }
 
 // Parse 解析数据
@@ -259,6 +296,16 @@ func (s *SF32) GetValue(name string) float32 {
 		}
 	}
 	return 0
+}
+
+// Reset 重置
+func (s *SF32) Reset() {
+	if len(s.str) > 0 {
+		s.str = s.str[:0]
+	}
+	if len(s.f32) > 0 {
+		s.f32 = s.f32[:0]
+	}
 }
 
 // TimesRate 次数/比例值对
