@@ -81,7 +81,7 @@ func (a *authorize) Check(as string) (code string, ok bool) {
 	// md5 code
 	sdx := pack.Size() - md5.Size
 	vCode := pack.Slice(sdx, -1)
-	last := sdx+8
+	last := sdx + 8
 	pack.Seek(0, last)
 	pack.Write(vCode)
 	vCode = pack.Slice(last, -1)
@@ -165,9 +165,10 @@ func (a *authorize) CheckAPI(uid, api string) bool {
 		VERSION  = `version`
 		LOGIN    = `login`
 		REGISTER = `register`
+		GUEST    = `loginCutGuest`
 	)
 	if uid != "" {
 		return true
 	}
-	return api == VERSION || api == LOGIN || api == REGISTER
+	return api == VERSION || api == LOGIN || api == REGISTER || api == GUEST
 }
