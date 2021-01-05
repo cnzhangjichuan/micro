@@ -104,6 +104,11 @@ func (b *baseDpo) LoadUser(u packet.Identifier) bool {
 	return LoadUser(u, uid)
 }
 
+// SetUser 绑定用户数据
+func SetUser(u packet.Identifier) {
+	env.userCache.Put(u.GetUID(), u)
+}
+
 // SetUser 设置用户数据
 func (b *baseDpo) SetUser(u packet.Identifier) {
 	b.uid = u.GetUID()

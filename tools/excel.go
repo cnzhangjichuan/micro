@@ -13,6 +13,22 @@ import (
 
 var errExcelEmptyData = errors.New("excel: empty data")
 
+type OnSetupFunc func(uint64) interface{}
+
+// ExcelUnmarshal 将excel流解析成结构体
+func ExcelUnmarshal(r io.Reader, typeIndex int, onSetup OnSetupFunc) error {
+	// 读取数据
+	pack, err := ExcelSax(r, typeIndex)
+	if err != nil {
+		return err
+	}
+
+	// 放置数据
+	ExcelAutoReadFromCache(pack, onSetup)
+	packet.Free(pack)
+	return nil
+}
+
 // ExcelReadFrom 从文件中读取数据
 func ExcelReadFrom(name string, onSetup func(uint64), onReadRow func(*packet.Packet, []string, uint64)) {
 	pack, err := packet.NewWithFile(name)
@@ -31,13 +47,18 @@ func ExcelReadFrom(name string, onSetup func(uint64), onReadRow func(*packet.Pac
 }
 
 // ExcelReadFrom 从文件中读取数据
-func ExcelAutoReadFrom(name string, onSetup func(uint64) interface{}) {
+func ExcelAutoReadFrom(name string, onSetup OnSetupFunc) {
 	pack, err := packet.NewWithFile(name)
 	if err != nil {
 		micro.Errorf("load %s error: %v", name, err)
 		return
 	}
+	ExcelAutoReadFromCache(pack, onSetup)
+	packet.Free(pack)
+}
 
+// ExcelReadFrom 从缓存中读取数据
+func ExcelAutoReadFromCache(pack *packet.Packet, onSetup OnSetupFunc) {
 	names := pack.ReadStrings()
 	size := pack.ReadU64()
 	arrayValue := reflect.ValueOf(onSetup(size))
@@ -74,7 +95,6 @@ func ExcelAutoReadFrom(name string, onSetup func(uint64) interface{}) {
 			}
 		}
 	}
-	packet.Free(pack)
 }
 
 // ExcelSaveTo 将Excel数据保存到指定的文件中
@@ -84,24 +104,38 @@ func ExcelSaveTo(r io.Reader, dst string) error {
 
 // ExcelSaveToWithTypeIndex 将Excel数据保存到指定的文件中
 func ExcelSaveToWithTypeIndex(r io.Reader, dst string, typeIndex int) error {
-	pack, err := packet.NewWithReader(r)
+	pack, err := ExcelSax(r, typeIndex)
 	if err != nil {
 		return err
+	}
+
+	// 保存到文件
+	err = pack.SaveToFile(dst)
+	packet.Free(pack)
+
+	return err
+}
+
+// ExcelSax 将Excel数据解析到缓存中
+func ExcelSax(r io.Reader, typeIndex int) (*packet.Packet, error) {
+	pack, err := packet.NewWithReader(r)
+	if err != nil {
+		return nil, err
 	}
 
 	xf, err := xlsx.OpenReaderAt(pack, int64(pack.Size()))
 	if err != nil {
 		packet.Free(pack)
-		return err
+		return nil, err
 	}
 	if len(xf.Sheets) == 0 {
 		packet.Free(pack)
-		return errExcelEmptyData
+		return nil, errExcelEmptyData
 	}
 	rows := xf.Sheets[0].Rows
 	if len(rows) < typeIndex+1 {
 		packet.Free(pack)
-		return errExcelEmptyData
+		return nil, errExcelEmptyData
 	}
 	pack.Reset()
 
@@ -127,11 +161,7 @@ func ExcelSaveToWithTypeIndex(r io.Reader, dst string, typeIndex int) error {
 		excelWriteRow(pack, rows[r], types)
 	}
 
-	// 保存到文件
-	err = pack.SaveToFile(dst)
-	packet.Free(pack)
-
-	return err
+	return pack, nil
 }
 
 // excelGetRowTypes 获取表头信息
