@@ -1,4 +1,4 @@
-package synchro
+package xutils
 
 import (
 	"strconv"
@@ -29,6 +29,14 @@ func (s *SI32) Add(n string, i int32) {
 	s.i32 = append(s.i32, i)
 }
 
+// AddAll 添加数据
+func (s *SI32) AddAll(i *SI32) {
+	for x := 0; x < i.Len(); x++ {
+		n, v := i.Get(x)
+		s.Add(n, v)
+	}
+}
+
 // Merge 添加数据
 func (s *SI32) Merge(n string, i int32) {
 	for x := 0; x < len(s.str); x++ {
@@ -38,6 +46,23 @@ func (s *SI32) Merge(n string, i int32) {
 		}
 	}
 	s.Add(n, i)
+}
+
+// MergeAll 添加数据
+func (s *SI32) MergeAll(i *SI32) {
+	for x := 0; x < i.Len(); x++ {
+		n, v := i.Get(x)
+		s.Merge(n, v)
+	}
+}
+
+// 设置为消耗
+func (s *SI32) EnableCost() {
+	for i, v := range s.i32 {
+		if v > 0 {
+			s.i32[i] = 0-v
+		}
+	}
 }
 
 // Parse 解析数据

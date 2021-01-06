@@ -2,10 +2,11 @@ package iap
 
 import (
 	"bytes"
-	"github.com/micro/xutils"
 	"io/ioutil"
 	"net/http"
 	"strings"
+
+	"github.com/micro/xutils"
 )
 
 type Verifier struct {
@@ -28,7 +29,7 @@ var (
 func (v *Verifier) Verify(receiptData string, skipSandbox bool) error {
 	var (
 		url         = backendVerifyUrl
-		requestData = strings.Join([]string {
+		requestData = strings.Join([]string{
 			`{"receipt-data":"`, receiptData, `","password":"`, v.sharedSecretKey, `"}`,
 		}, "")
 	)

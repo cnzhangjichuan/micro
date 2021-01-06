@@ -67,3 +67,32 @@ func ParseTimeWithLayout(layout, value string) (int64, error) {
 func DaysOfMonth() int {
 	return time.Now().Day()
 }
+
+// SETime 起止时段
+type SETime struct {
+	s int64
+	e int64
+}
+
+// Parse 从字符串中解析
+// s格式[yyyy/MM/dd HH:mm,...]
+func (t *SETime) Parse(s string) {
+	ss := SplitN(s)
+	if len(ss) > 0 {
+		t.s, _ = ParseTime(ss[0])
+	}
+	if len(ss) > 1 {
+		t.e, _ = ParseTime(ss[1])
+	}
+}
+
+// Contains 是否在包含指定的时间
+func (t *SETime) Contains(at int64) (bool, bool) {
+	if t.s > 0 && at < t.s {
+		return false, false
+	}
+	if t.e > 0 && at >= t.e {
+		return true, false
+	}
+	return false, true
+}
