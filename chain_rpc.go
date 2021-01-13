@@ -84,6 +84,15 @@ func (r *rpc) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 		address = conn.RemoteAddr().String()
 	}
 
+	// 发送确认信号
+	pack.BeginWrite()
+	pack.WriteI32(1)
+	pack.EndWrite()
+	_, err := pack.FlushToConn(conn)
+	if err != nil {
+		return true
+	}
+
 	// 注册连接
 	r.com.Lock()
 	r.cos[address] = conn
@@ -92,7 +101,7 @@ func (r *rpc) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 	// 处理数据
 	r.receive(conn)
 
-	// 注锁连接
+	// 注销连接
 	r.com.Lock()
 	delete(r.cos, address)
 	r.com.Unlock()
@@ -217,11 +226,24 @@ func (r *rpc) GetConn(adr string) (conn net.Conn, err error) {
 	pack.Write(httpRowAt)
 	pack.Write(httpRowAt)
 	_, err = pack.FlushToConn(conn)
-	packet.Free(pack)
 	if err != nil {
 		r.com.Unlock()
+		packet.Free(pack)
+		conn.Close()
 		return
 	}
+
+	// 获取连接状态
+	err = pack.ReadConn(conn)
+	if err != nil || pack.ReadI32() != 1 {
+		r.com.Unlock()
+		packet.Free(pack)
+		conn.Close()
+		err = errRPCTimeout
+		return
+	}
+
+	// 缓存本次连接
 	r.cos[adr] = conn
 	r.com.Unlock()
 

@@ -2,14 +2,40 @@ package xutils
 
 import "time"
 
-// Days 距离1970-01-01日的天数
-func Days(t time.Time) int {
+var (
+	zero        = time.Date(1970, 1, 1, 0, 0, 0, 0, time.Local)
+	offsetInDay = 0 - zero.Unix()
+)
+
+const (
+	daySec  = 86400
+	weekSec = 604800
+)
+
+// DaysNow 已过天数
+func DaysNow() int32 {
+	return DaysWithStamp(NowSec())
+}
+
+// Days 已过天数
+func Days(t time.Time) int32 {
 	return DaysWithStamp(t.Unix())
 }
 
-// DaysNow 当前距离1970-01-01日的天数
-func DaysNow() int {
-	return Days(time.Now())
+// DaysWithStamp 已过天数
+func DaysWithStamp(stamp int64) int32 {
+	return int32(stamp / daySec)
+}
+
+// DaysWithDateString 已过天数
+func DaysWithDateString(value string) int32 {
+	const layout = `2006/01/02`
+
+	t, err := ParseTimeWithLayout(layout, value)
+	if err != nil {
+		return 0
+	}
+	return DaysWithStamp(t)
 }
 
 // 当前时间
@@ -19,32 +45,17 @@ func Now() time.Time {
 
 // NowSec 当前秒数
 func NowSec() int64 {
-	return time.Now().Unix()
+	return Now().Unix() + offsetInDay
 }
 
-// DaysWithStamp 距离1970-01-01日的天数
-func DaysWithStamp(stamp int64) int {
-	const DAY = 86400
-
-	return int(stamp / DAY)
+// TodaySec 今天已过的秒数
+func TodaySec() int32 {
+	return int32(NowSec() % daySec)
 }
 
-// WeeksWithStamp 距离1970-01-01日的周数
-func WeeksWithStamp(stamp int64) int {
-	const WEEK = 604800 //86400*7
-
-	return int(stamp / WEEK)
-}
-
-// DaysWithDateString 距离1970-01-01日的天数
-func DaysWithDateString(value string) int {
-	const layout = `2006/01/02`
-
-	t, err := time.ParseInLocation(layout, value, time.UTC)
-	if err != nil {
-		return 0
-	}
-	return DaysWithStamp(t.Unix())
+// WeeksWithStamp 已过周数
+func WeeksWithStamp(stamp int64) int32 {
+	return int32(stamp / weekSec)
 }
 
 // ParseTime 时间转换
@@ -56,7 +67,7 @@ func ParseTime(value string) (int64, error) {
 
 // ParseTimeWithLayout 时间转换
 func ParseTimeWithLayout(layout, value string) (int64, error) {
-	t, err := time.ParseInLocation(layout, value, time.UTC)
+	t, err := time.ParseInLocation(layout, value, time.Local)
 	if err != nil {
 		return 0, err
 	}
@@ -64,8 +75,8 @@ func ParseTimeWithLayout(layout, value string) (int64, error) {
 }
 
 // DayInMonth 月中第几天
-func DaysOfMonth() int {
-	return time.Now().Day()
+func DaysOfMonth() int32 {
+	return int32(Now().Day())
 }
 
 // SETime 起止时段
@@ -87,12 +98,12 @@ func (t *SETime) Parse(s string) {
 }
 
 // Contains 是否在包含指定的时间
-func (t *SETime) Contains(at int64) (bool, bool) {
+func (t *SETime) Contains(at int64) bool {
 	if t.s > 0 && at < t.s {
-		return false, false
+		return false
 	}
 	if t.e > 0 && at >= t.e {
-		return true, false
+		return false
 	}
-	return false, true
+	return true
 }

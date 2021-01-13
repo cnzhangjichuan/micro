@@ -380,6 +380,24 @@ func RemoveSS(ss []string, s string) []string {
 	return ss
 }
 
+// RemoveAt 从[]string中删除指定的元素
+func RemoveAt(ss []string, i int) []string {
+	if i < 0 || i >= len(ss) {
+		return ss
+	}
+	copy(ss[i:], ss[i+1:])
+	return ss[:len(ss)-1]
+}
+
+// RemoveAtI32 从[]int32中删除指定的元素
+func RemoveAtI32(ss []int32, i int) []int32 {
+	if i < 0 || i >= len(ss) {
+		return ss
+	}
+	copy(ss[i:], ss[i+1:])
+	return ss[:len(ss)-1]
+}
+
 // AddNoRepeatItem 添加不重复的元素
 func AddNoRepeatItem(ss []string, s string) []string {
 	if HasString(ss, s) {
