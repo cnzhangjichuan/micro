@@ -229,57 +229,60 @@ func (c *chunk) Del(k string) {
 // Update 更新数据
 func (c *chunk) Update(v Serializable, k string, upd func() bool, ini func()) {
 	var (
-		exists = false
-		ned    = false
-		nfb    = false
-		pack   *Packet
+		ned  = false
+		pack *Packet
 	)
 
 	c.Lock()
 	if data, ok := c.m[k]; ok {
-		// 组装数据
+		// 从缓存中加载数据
 		pack = NewWithData(data)
 		if c.expired > 0 {
 			pack.Seek(4, -1)
 		}
 		v.Decode(pack)
-		exists = true
-		nfb = true
 	} else {
-		// 没有缓存，从磁盘加载
-		exists = c.loadFromDisk(v, k)
-		ned = exists
-		pack = New(512)
-	}
-
-	// 如果数据不存在，调用初始化方法
-	if !exists && ini != nil {
-		ini()
-		ned = true
+		// 从磁盘中加载
+		exists := c.loadFromDisk(v, k)
+		if !exists && ini != nil {
+			ini()
+			ned = true
+		} else {
+			pack = New(512)
+			if c.expired > 0 {
+				binary.BigEndian.PutUint32(pack.Allocate(4), uint32(time.Now().Add(c.expired).Unix()))
+			}
+			v.Encode(pack)
+			c.m[k] = pack.buf[:pack.w]
+		}
 	}
 
 	// 执行更新操作
 	if upd != nil && upd() {
 		ned = true
 	}
+
 	if ned {
-		pack.Reset()
-		// 设置超时时间
+		if pack == nil {
+			pack = New(512)
+		} else {
+			pack.Reset()
+		}
 		if c.expired > 0 {
 			binary.BigEndian.PutUint32(pack.Allocate(4), uint32(time.Now().Add(c.expired).Unix()))
 		}
-		// 编码数据
 		v.Encode(pack)
 		c.m[k] = pack.buf[:pack.w]
-		pack.buf = nil
 		if c.saver != nil {
 			c.saver.Save(v, k)
 		}
-	} else if nfb {
-		pack.buf = nil
 	}
 	c.Unlock()
-	Free(pack)
+
+	if pack != nil {
+		pack.buf = nil
+		Free(pack)
+	}
 }
 
 // clearExpired 清除过期数据
