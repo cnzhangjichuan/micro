@@ -23,6 +23,19 @@ func (s *SI32) Init(n string, i int32) {
 	}
 }
 
+// Ratio 将数量折上一定的系数
+func (s *SI32) Ratio(r float32) (cpy SI32, ok bool) {
+	for x := 0; x < s.Len(); x++ {
+		n, v := s.Get(x)
+		v = int32(float32(v)*r)
+		if v > 0 {
+			ok = true
+			cpy.Add(n, v)
+		}
+	}
+	return
+}
+
 // Add 添加数据
 func (s *SI32) Add(n string, i int32) {
 	s.str = append(s.str, n)

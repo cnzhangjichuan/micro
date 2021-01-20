@@ -53,6 +53,11 @@ func TodaySec() int32 {
 	return int32(NowSec() % daySec)
 }
 
+// WeekNow 当前周
+func WeekNow() int32 {
+	return WeeksWithStamp(NowSec())
+}
+
 // WeeksWithStamp 已过周数
 func WeeksWithStamp(stamp int64) int32 {
 	return int32(stamp / weekSec)
