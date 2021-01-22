@@ -159,16 +159,18 @@ func (a *authorize) CheckToken(as string) (token string, ok bool) {
 	return
 }
 
+const (
+	VERSION  = `version`
+	LOGIN    = `login`
+	LoginDBA = `loginDBA`
+	REGISTER = `register`
+	GUEST    = `loginCutGuest`
+)
+
 // CheckAPI 是否可以访问API
 func (a *authorize) CheckAPI(uid, api string) bool {
-	const (
-		VERSION  = `version`
-		LOGIN    = `login`
-		REGISTER = `register`
-		GUEST    = `loginCutGuest`
-	)
 	if uid != "" {
 		return true
 	}
-	return api == VERSION || api == LOGIN || api == REGISTER || api == GUEST
+	return api == VERSION || api == LOGIN || api == LoginDBA || api == REGISTER || api == GUEST
 }
