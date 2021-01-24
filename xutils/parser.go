@@ -406,14 +406,51 @@ func AddNoRepeatItem(ss []string, s string) []string {
 	return append(ss, s)
 }
 
-// AddFirstItem 将元素加到队列首位
-func AddFirstItem(ss []string, s string) []string {
+// AddFrontItem 将元素加到队列首位
+func AddFrontItem(ss []string, s string) []string {
 	ss = append(ss, "")
 	for i := len(ss) - 1; i > 0; i-- {
 		ss[i] = ss[i-1]
 	}
 	ss[0] = s
 	return ss
+}
+
+// AddFrontString 添加不重复的队首元素
+func AddFrontString(s string, item string, size int) (string, bool) {
+	if s == "" {
+		return item, item != ""
+	}
+	ss := strings.Split(s, ",")
+	if len(ss) == 0 {
+		return item, item != ""
+	}
+	if ss[0] == item {
+		return s, false
+	}
+	if i := IndexStrings(ss, item); i > 0 {
+		ss = append(ss[:i], ss[i+1:]...)
+	}
+	ss = AddFrontItem(ss, item)
+	return strings.Join(ss, ","), true
+}
+
+// AddBackString 添加不重复的队尾元素
+func AddBackString(s string, item string, size int) (string, bool) {
+	if s == "" {
+		return item, item != ""
+	}
+	ss := strings.Split(s, ",")
+	if len(ss) == 0 {
+		return item, item != ""
+	}
+	if ss[len(ss)-1] == item {
+		return s, false
+	}
+	if i := IndexStrings(ss, item); i > 0 {
+		ss = append(ss[:i], ss[i+1:]...)
+	}
+	return strings.Join(append(ss, item), ","), true
 }
 
 // 将string->[]string，并去除空元素
