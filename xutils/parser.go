@@ -426,12 +426,18 @@ func AddFrontString(s string, item string, size int) (string, bool) {
 		return item, item != ""
 	}
 	if ss[0] == item {
-		return s, false
+		if len(ss) <= size {
+			return s, false
+		}
+	} else {
+		if i := IndexStrings(ss, item); i > 0 {
+			ss = append(ss[:i], ss[i+1:]...)
+		}
+		ss = AddFrontItem(ss, item)
 	}
-	if i := IndexStrings(ss, item); i > 0 {
-		ss = append(ss[:i], ss[i+1:]...)
+	if len(ss) > size {
+		ss = ss[:size]
 	}
-	ss = AddFrontItem(ss, item)
 	return strings.Join(ss, ","), true
 }
 
@@ -445,12 +451,19 @@ func AddBackString(s string, item string, size int) (string, bool) {
 		return item, item != ""
 	}
 	if ss[len(ss)-1] == item {
-		return s, false
+		if len(ss) <= size {
+			return s, false
+		}
+	} else {
+		if i := IndexStrings(ss, item); i > 0 {
+			ss = append(ss[:i], ss[i+1:]...)
+		}
+		ss = append(ss, item)
 	}
-	if i := IndexStrings(ss, item); i > 0 {
-		ss = append(ss[:i], ss[i+1:]...)
+	if len(ss) > size {
+		ss = ss[len(ss)-size:]
 	}
-	return strings.Join(append(ss, item), ","), true
+	return strings.Join(ss, ","), true
 }
 
 // 将string->[]string，并去除空元素
