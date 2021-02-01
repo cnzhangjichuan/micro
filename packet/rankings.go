@@ -55,6 +55,29 @@ type rankingItem struct {
 	Data  []byte
 }
 
+// Clear 清除榜单返回第一条数据
+func (r *Rankings) Clear(first RankingItem) (ok bool) {
+	r.Lock()
+	l := len(r.items)
+	if l > 0 && r.items[0].Id != "" {
+		ok = true
+		pack := packetPool.Get().(*Packet)
+		pack.freed = 0
+		pack.buf = r.items[0].Data
+		pack.r, pack.w = 0, len(pack.buf)
+		first.Decode(pack)
+		first.SetRank(r.items[0].Rank)
+		pack.buf = nil
+		Free(pack)
+	}
+	r.items = make([]rankingItem, l)
+	if l > 0 && r.saver != nil {
+		//r.saver.Save(r.name, []byte{})
+	}
+	r.Unlock()
+	return
+}
+
 // GetRank 查找ID对应的排名
 func (r *Rankings) GetRank(id string) int32 {
 	r.RLock()

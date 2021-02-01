@@ -27,10 +27,28 @@ func (s *SI32) Init(n string, i int32) {
 func (s *SI32) Ratio(r float32) (cpy SI32, ok bool) {
 	for x := 0; x < s.Len(); x++ {
 		n, v := s.Get(x)
-		v = int32(float32(v)*r)
-		if v > 0 {
+		v = int32(float32(v) * r)
+		if v >= 1 || v <= -1 {
 			ok = true
 			cpy.Add(n, v)
+		}
+	}
+	return
+}
+
+// Ratio 将数量折上一定的系数
+func (s *SI32) RatioOnly(r float32, nn string) (cpy SI32, ok bool) {
+	for x := 0; x < s.Len(); x++ {
+		n, v := s.Get(x)
+		if n != nn {
+			ok = true
+			cpy.Add(n, v)
+		} else {
+			v = int32(float32(v) * r)
+			if v >= 1 || v <= -1 {
+				ok = true
+				cpy.Add(n, v)
+			}
 		}
 	}
 	return
@@ -73,7 +91,7 @@ func (s *SI32) MergeAll(i *SI32) {
 func (s *SI32) EnableCost() {
 	for i, v := range s.i32 {
 		if v > 0 {
-			s.i32[i] = 0-v
+			s.i32[i] = 0 - v
 		}
 	}
 }
