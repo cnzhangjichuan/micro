@@ -71,6 +71,9 @@ func (r *Rankings) Clear(first RankingItem) (ok bool) {
 		Free(pack)
 	}
 	r.items = make([]rankingItem, l)
+	for i := 0; i < l; i++ {
+		r.items[i].Rank = int32(i + 1)
+	}
 	if l > 0 && r.saver != nil {
 		//r.saver.Save(r.name, []byte{})
 	}

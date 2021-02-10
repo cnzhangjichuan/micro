@@ -23,14 +23,32 @@ func (s *SI32) Init(n string, i int32) {
 	}
 }
 
+// String 返回字符串
+func (s *SI32) String() string {
+	l := s.Len()
+	if l <= 0 {
+		return ""
+	}
+	ss := make([]string, 0, 2*l)
+	for x := 0; x < l; x++ {
+		ss = append(ss, s.str[x])
+		ss = append(ss, strconv.Itoa(int(s.i32[x])))
+	}
+	return strings.Join(ss, ",")
+}
+
 // Ratio 将数量折上一定的系数
 func (s *SI32) Ratio(r float32) (cpy SI32, ok bool) {
+	cpy.str = make([]string, s.Len())
+	cpy.i32 = make([]int32, s.Len())
 	for x := 0; x < s.Len(); x++ {
-		n, v := s.Get(x)
-		v = int32(float32(v) * r)
+		cpy.str[x] = s.str[x]
+		v := int32(float32(s.i32[x]) * r)
 		if v >= 1 || v <= -1 {
 			ok = true
-			cpy.Add(n, v)
+			cpy.i32[x] = v
+		} else {
+			cpy.i32[x] = s.i32[x]
 		}
 	}
 	return
@@ -38,20 +56,27 @@ func (s *SI32) Ratio(r float32) (cpy SI32, ok bool) {
 
 // Ratio 将数量折上一定的系数
 func (s *SI32) RatioOnly(r float32, nn string) (cpy SI32, ok bool) {
+	cpy.str = make([]string, s.Len())
+	cpy.i32 = make([]int32, s.Len())
 	for x := 0; x < s.Len(); x++ {
-		n, v := s.Get(x)
-		if n != nn {
+		cpy.str[x] = s.str[x]
+		if cpy.str[x] == nn {
 			ok = true
-			cpy.Add(n, v)
+			cpy.i32[x] = int32(float32(s.i32[x]) * r)
 		} else {
-			v = int32(float32(v) * r)
-			if v >= 1 || v <= -1 {
-				ok = true
-				cpy.Add(n, v)
-			}
+			cpy.i32[x] = s.i32[x]
 		}
 	}
 	return
+}
+
+// Ratio 将数量折上一定的系数
+func (s *SI32) RatioThis(nn string, r float32) {
+	for x := 0; x < s.Len(); x++ {
+		if s.str[x] == nn {
+			s.i32[x] = int32(float32(s.i32[x]) * r)
+		}
+	}
 }
 
 // Add 添加数据

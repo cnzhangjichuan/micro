@@ -265,6 +265,17 @@ func IndexStrings(arr []string, item string) int {
 	return -1
 }
 
+// IndexI32 元素在列表中的位置
+func IndexI32(arr []int32, item int32) int {
+	al := len(arr)
+	for i := 0; i < al; i++ {
+		if arr[i] == item {
+			return i
+		}
+	}
+	return -1
+}
+
 // EqualStrings 数组值是否相等
 func EqualStrings(s1, s2 []string) bool {
 	if len(s1) != len(s2) {
@@ -471,14 +482,17 @@ func SplitN(s string) []string {
 	if s == "" {
 		return nil
 	}
-	sa := strings.Split(s, ",")
-	ret := make([]string, 0, len(sa))
-	for _, v := range sa {
-		if v != "" {
-			ret = append(ret, v)
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	}
+	sa := strings.Split(s, sep)
+	for i := len(sa) - 1; i >= 0; i-- {
+		if sa[i] == "" {
+			sa = append(sa[0:i], sa[i+1:]...)
 		}
 	}
-	return ret
+	return sa
 }
 
 // ParseFileName 提取文件名称
