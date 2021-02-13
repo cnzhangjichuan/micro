@@ -79,6 +79,13 @@ func ParseTimeWithLayout(layout, value string) (int64, error) {
 	return t.Unix(), nil
 }
 
+// FormatNow 当前日期YMD
+func FormatNow() string {
+	const layout = `2006/01/02`
+
+	return time.Now().Format(layout)
+}
+
 // DayInMonth 月中第几天
 func DaysOfMonth() int32 {
 	return int32(Now().Day())

@@ -13,74 +13,101 @@ type Verifier struct {
 	sharedSecretKey string
 }
 
-// New 创建验证实例
+// Init 初始化实例
 // sharedSecretKey 共享密钥
-func New(sharedSecretKey string) *Verifier {
-	return &Verifier{
-		sharedSecretKey: sharedSecretKey,
-	}
+func (v *Verifier) Init(sharedSecretKey string) {
+	v.sharedSecretKey = sharedSecretKey
 }
 
 var (
-	statusPrefix = []byte(`"status":`)
+	statusPrefix      = []byte(`"status":`)
+	productPrefix     = []byte(`"product_id":`)
+	transactionPrefix = []byte(`"original_transaction_id":`)
 )
 
-// 验证票据是否合法
-func (v *Verifier) Verify(receiptData string, skipSandbox bool) error {
+// Verify 验证票据是否合法
+func (v *Verifier) Verify(receiptData string, skipSandbox bool) (productId, transactionId string, err error) {
 	var (
 		url         = backendVerifyUrl
 		requestData = strings.Join([]string{
 			`{"receipt-data":"`, receiptData, `","password":"`, v.sharedSecretKey, `"}`,
 		}, "")
+		resp *http.Response
+		data []byte
 	)
 
 	for i := 0; i < 2; i++ {
-		resp, err := http.Post(url, `application/x-www-form-urlencoded`, bytes.NewReader([]byte(requestData)))
+		resp, err = http.Post(url, `application/x-www-form-urlencoded`, bytes.NewReader([]byte(requestData)))
 		if err != nil {
-			return err
+			return
 		}
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err = ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return err
+			return
 		}
-		i := bytes.Index(data, statusPrefix)
-		if i < 0 {
-			return errOthers
+		status, ok := v.propertyValue(data, statusPrefix)
+		if !ok {
+			err = errOthers
+			return
 		}
-		data = data[i+len(statusPrefix):]
-		i = bytes.IndexByte(data, ',')
-		if i < 0 {
-			i = bytes.IndexByte(data, '}')
-		}
-		code := xutils.ParseI32(string(data[:i]), -1)
-		switch code {
+		switch xutils.ParseI32(status, -1) {
 		default:
-			return errOthers
+			err = errOthers
+			return
 		case respCodeSuccess:
-			return nil
+			productId, _ = v.propertyValue(data, productPrefix)
+			transactionId, _ = v.propertyValue(data, transactionPrefix)
+			return
 		case respCode21000:
-			return err21000
+			err = err21000
+			return
 		case respCode21002:
-			return err21002
+			err = err21002
+			return
 		case respCode21003:
-			return err21003
+			err = err21003
+			return
 		case respCode21004:
-			return err21004
+			err = err21004
+			return
 		case respCode21005:
-			return err21005
+			err = err21005
+			return
 		case respCode21006:
-			return err21006
+			err = err21006
+			return
 		case respCode21007:
 			if skipSandbox {
-				return err21007
+				err = err21007
+				return
 			}
 			url = sandboxVerifyUrl
 		case respCode21008:
-			return err21008
+			err = err21008
+			return
 		case respCode21010:
-			return err21010
+			err = err21010
+			return
 		}
 	}
-	return errOthers
+	return
+}
+
+// propertyValue 获取对应的JSON值
+func (v *Verifier) propertyValue(data, prefix []byte) (s string, ok bool) {
+	i := bytes.Index(data, prefix)
+	if i < 0 {
+		return
+	}
+	data = data[i+len(prefix):]
+	i = bytes.IndexByte(data, ',')
+	if i < 0 {
+		i = bytes.IndexByte(data, '}')
+	}
+	if i < 0 {
+		i = len(data)
+	}
+	s, ok = string(bytes.Trim(bytes.TrimSpace(data[:i]), `"`)), true
+	return
 }
