@@ -58,8 +58,8 @@ func parseToLua(src, dst string) error {
 		fd.WriteString(name)
 		fd.WriteString("={")
 		sty := types.Cells[i].String()
-		for r := 4; r < len(rows); r++ {
-			if r > 4 {
+		for r := 3; r < len(rows); r++ {
+			if r > 3 {
 				fd.WriteString(",")
 			}
 			rw := rows[r]
@@ -71,10 +71,6 @@ func parseToLua(src, dst string) error {
 				fd.WriteString("\"")
 				fd.WriteString(v)
 				fd.WriteString("\"")
-			} else if sty == "numbers_mul" {
-				fd.WriteString("{")
-				fd.WriteString(strings.Replace(v, ";", ",", -1))
-				fd.WriteString("}")
 			} else {
 				if v == "" {
 					fd.WriteString("0")

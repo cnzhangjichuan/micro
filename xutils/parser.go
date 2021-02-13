@@ -497,10 +497,21 @@ func ParseFileName(name string) string {
 }
 
 // RandSortI32 将数据乱序
-func RandSortI32(i32s []int32) {
+func RandSortI32(i32s []int32, start int) {
 	l := len(i32s)
-	for i := 8; i < l; i++ {
+	if start < 0 {
+		start = 0
+	}
+	for i := start; i < l; i++ {
 		w := rand.Intn(l)
 		i32s[i], i32s[w] = i32s[w], i32s[i]
 	}
+}
+
+// RandMinMax 获取min到max之间的随机值
+func RandMinMax(min, max int32) int32 {
+	if min >= max {
+		return min
+	}
+	return min + rand.Int31n(max-min+1)
 }
