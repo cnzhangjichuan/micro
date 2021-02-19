@@ -7,8 +7,7 @@ import (
 
 // Rankings 排行榜
 type Rankings struct {
-	sync.RWMutex
-
+	rm       sync.RWMutex
 	name     string
 	saver    SingleSaver
 	items    []rankingItem
@@ -55,9 +54,33 @@ type rankingItem struct {
 	Data  []byte
 }
 
+// Remove 移除榜中数据
+func (r *Rankings) Remove(id string) {
+	r.rm.Lock()
+	start := false
+	l := len(r.items)
+	for i := 0; i < l; i++ {
+		if !start && r.items[i].Id == id {
+			start = true
+			continue
+		}
+		if start {
+			r.items[i-1].Id = r.items[i].Id
+			r.items[i-1].Value = r.items[i].Value
+			r.items[i-1].Data = r.items[i].Data
+		}
+	}
+	if start {
+		r.items[l-1].Id = ""
+		r.items[l-1].Value = 0
+		r.items[l-1].Data = nil
+	}
+	r.rm.Unlock()
+}
+
 // Clear 清除榜单返回第一条数据
 func (r *Rankings) Clear(first RankingItem) (ok bool) {
-	r.Lock()
+	r.rm.Lock()
 	l := len(r.items)
 	if l > 0 && r.items[0].Id != "" {
 		ok = true
@@ -74,18 +97,18 @@ func (r *Rankings) Clear(first RankingItem) (ok bool) {
 	for i := 0; i < l; i++ {
 		r.items[i].Rank = int32(i + 1)
 	}
-	if l > 0 && r.saver != nil {
-		//r.saver.Save(r.name, []byte{})
-	}
-	r.Unlock()
+	//if l > 0 && r.saver != nil {
+	//	r.saver.Save(r.name, []byte{})
+	//}
+	r.rm.Unlock()
 	return
 }
 
 // GetRank 查找ID对应的排名
 func (r *Rankings) GetRank(id string) int32 {
-	r.RLock()
-	i := r.findIndex(id)
-	r.RUnlock()
+	r.rm.RLock()
+	i := r.findIndex(id, 0)
+	r.rm.RUnlock()
 
 	if i == -1 {
 		return -1
@@ -107,46 +130,42 @@ func (resp *RankingResult) Encode(p *Packet) {
 }
 
 // GetRankings 获取榜单列表
-func (r *Rankings) GetRankings(offset, count int, id string) (ret *RankingResult) {
+func (r *Rankings) GetRankings(offset, count int, id string, minValue int32) (ret *RankingResult) {
 	ret = &RankingResult{}
-	e := offset + count
-	if e > len(r.items) {
-		e = len(r.items)
-	}
-	if offset >= e {
-		return
-	}
-	idIdx := -1
 	pack := packetPool.Get().(*Packet)
 	pack.freed = 0
-	r.RLock()
+	r.rm.RLock()
 
-	// 加载自身的排名
-	ls := e - offset
-	if id != "" {
-		idIdx = r.findIndex(id)
-		if idIdx >= offset && idIdx < e {
-			// 如果自身排名在列表中，不再单独加载
-			idIdx = -1
+	found := id == ""
+	// 加载列表
+	for i := 0; i < len(r.items); i++ {
+		if r.items[i].Value < minValue {
+			break
 		}
-		if idIdx != -1 {
-			ls += 1
+		// 加载传入的值
+		if r.items[i].Id == id {
+			found = true
+			r.loadRankingItem(ret, pack, i)
+			continue
 		}
-	}
-
-	// 将数据装入结果列表中
-	ret.List = make([]RankingItem, 0, ls)
-	if idIdx != -1 && idIdx < offset {
-		r.loadRankingItem(ret, pack, idIdx)
-	}
-	for i := offset; i < e; i++ {
+		if i < offset {
+			continue
+		}
 		r.loadRankingItem(ret, pack, i)
+		count -= 1
+		if count <= 0 {
+			break
+		}
 	}
-	if idIdx >= e {
-		r.loadRankingItem(ret, pack, idIdx)
-	}
-	r.RUnlock()
 
+	// 加载传入的值
+	if !found {
+		x := r.findIndex(id, minValue)
+		if x >= 0 {
+			r.loadRankingItem(ret, pack, x)
+		}
+	}
+	r.rm.RUnlock()
 	pack.buf = nil
 	Free(pack)
 	return
@@ -173,6 +192,60 @@ func (r *Rankings) GetNearWindow(leftCount, rightCount, step int) []int32 {
 	return window
 }
 
+// RandomID 随机加载一个相领的元素ID
+func (r *Rankings) RandomID(id string, offset int) (string, int32) {
+	var (
+		maxCount = offset * 2
+		ids      = make([]string, 0, maxCount)
+		vls      = make([]int32, 0, maxCount)
+		i        = 0
+	)
+	r.rm.RLock()
+	for ; i < len(r.items); i++ {
+		// 没有数据时跳出
+		if r.items[i].Id == "" {
+			break
+		}
+		// 找到传入ID位置
+		if r.items[i].Id != id {
+			continue
+		}
+		// 向下取数
+		for j := i + 1; j < len(r.items) && len(ids) < offset; j++ {
+			if r.items[j].Id == "" {
+				break
+			}
+			ids = append(ids, r.items[j].Id)
+			vls = append(vls, r.items[j].Value)
+		}
+		// 向上取数
+		for j := i - 1; j >= 0 && len(ids) < maxCount; j-- {
+			ids = append(ids, r.items[j].Id)
+			vls = append(vls, r.items[j].Value)
+		}
+		break
+	}
+	// 不在榜中，从最未取数
+	if len(ids) == 0 {
+		for j := i - 1; j >= 0 && len(ids) < maxCount; j-- {
+			ids = append(ids, r.items[j].Id)
+			vls = append(vls, r.items[j].Value)
+		}
+	}
+	r.rm.RUnlock()
+
+	// 从结果中随机一个数值
+	l := len(ids)
+	if l == 0 {
+		return "", 0
+	}
+	if l == 1 {
+		return ids[0], vls[0]
+	}
+	idx := rand.Intn(l)
+	return ids[idx], vls[idx]
+}
+
 // GetNears 加载与自身相邻的榜单数据
 // id 自身ID
 // window 查找的窗口范围
@@ -182,16 +255,16 @@ func (r *Rankings) GetNears(id string, window []int32, top int, mine bool) (ret 
 	ret = &RankingResult{}
 
 	// 查找自身所在的索引位置
-	r.RLock()
-	cdx := r.findIndex(id)
-	r.RUnlock()
+	r.rm.RLock()
+	cdx := r.findIndex(id, 0)
+	r.rm.RUnlock()
 
 	pack := packetPool.Get().(*Packet)
 	pack.freed = 0
 
 	// 装载数据
 	ids := r.calNearCoordinate(window, cdx, top)
-	r.RLock()
+	r.rm.RLock()
 	skip := false
 	for _, i := range ids {
 		if !mine && i == cdx {
@@ -207,7 +280,7 @@ func (r *Rankings) GetNears(id string, window []int32, top int, mine bool) (ret 
 			r.loadRankingItem(ret, pack, last)
 		}
 	}
-	r.RUnlock()
+	r.rm.RUnlock()
 
 	pack.buf = nil
 	Free(pack)
@@ -216,54 +289,27 @@ func (r *Rankings) GetNears(id string, window []int32, top int, mine bool) (ret 
 
 // AddRobot 添加机器人
 func (r *Rankings) AddRobot(item RankingItem) (rank int32) {
-	r.Lock()
-	i := r.findIndex(item.GetID())
+	r.rm.Lock()
+	i := r.findIndex(item.GetID(), 0)
 	if i >= 0 {
 		rank = r.items[i].Rank
-		r.Unlock()
+		r.rm.Unlock()
 		return
 	}
 	rank, _ = r.update(item)
-	r.Unlock()
+	r.rm.Unlock()
 	return
 }
 
 // Update 更新数据
 func (r *Rankings) Update(item RankingItem) (rank, delta int32) {
-	r.Lock()
+	r.rm.Lock()
 	rank, delta = r.update(item)
-	r.Unlock()
+	r.rm.Unlock()
 	return
 }
 
-// UpdateTwo 更新数据
-func (r *Rankings) UpdateTwo(mine, opp RankingItem, syncFunc func(int32, int32)) (mineRank, mineDelta, oppRank, oppDelta int32) {
-	r.Lock()
-	if syncFunc != nil {
-		var (
-			mv int32
-			ov int32
-		)
-		mdx := r.findIndex(mine.GetID())
-		if mdx >= 0 {
-			mv = r.items[mdx].Value
-		} else {
-			mv = mine.GetValue()
-		}
-		odx := r.findIndex(opp.GetID())
-		if odx >= 0 {
-			ov = r.items[odx].Value
-		} else {
-			ov = opp.GetValue()
-		}
-		syncFunc(mv, ov)
-	}
-	mineRank, mineDelta = r.update(mine)
-	oppRank, oppDelta = r.update(opp)
-	r.Unlock()
-	return
-}
-
+// update 更新数据
 func (r *Rankings) update(item RankingItem) (rank, delta int32) {
 	var (
 		idx   = -1
@@ -341,15 +387,15 @@ func (r *Rankings) update(item RankingItem) (rank, delta int32) {
 
 // Replace 将指定位置的数据替换掉
 func (r *Rankings) Replace(mine RankingItem, dest string) (rank, raise int32) {
-	r.Lock()
-	destIdx := r.findIndex(dest)
+	r.rm.Lock()
+	destIdx := r.findIndex(dest, 0)
 	if destIdx == -1 {
-		r.Unlock()
+		r.rm.Unlock()
 		rank, raise = -1, 0
 		return
 	}
 	rank = r.items[destIdx].Rank
-	mineIdx := r.findIndex(mine.GetID())
+	mineIdx := r.findIndex(mine.GetID(), 0)
 	oRank := rank
 	if mineIdx >= 0 {
 		r.swap(destIdx, mineIdx)
@@ -358,7 +404,7 @@ func (r *Rankings) Replace(mine RankingItem, dest string) (rank, raise int32) {
 		oRank = r.getOutRankingsRank(mine.GetValue())
 	}
 	r.updateItem(destIdx, mine)
-	r.Unlock()
+	r.rm.Unlock()
 	raise = oRank - rank
 	return
 }
@@ -397,7 +443,7 @@ func (r *Rankings) Save() {
 	pack := New(initCacheSize)
 	buff := New(buffItemSize)
 	dec := r.edCreate()
-	r.RLock()
+	r.rm.RLock()
 	for i := 0; i < len(r.items); i++ {
 		if r.items[i].Id == "" {
 			break
@@ -413,7 +459,7 @@ func (r *Rankings) Save() {
 		buff.EncodeJSON(dec, false, false)
 		pack.WriteBytes(buff.Data())
 	}
-	r.RUnlock()
+	r.rm.RUnlock()
 	r.saver.Save(r.name, pack.Data())
 	Free(buff)
 	Free(pack)
@@ -428,7 +474,7 @@ func (r *Rankings) loadData() {
 		buff := packetPool.Get().(*Packet)
 		buff.freed = 0
 		enc := r.edCreate()
-		r.Lock()
+		r.rm.Lock()
 		for i := 0; i < len(r.items); i++ {
 			r.items[i].Id = pack.ReadString()
 			if r.items[i].Id == "" {
@@ -442,19 +488,25 @@ func (r *Rankings) loadData() {
 			enc.Encode(buff)
 			r.items[i].Data = buff.Data()
 		}
-		r.Unlock()
+		r.rm.Unlock()
 		buff.buf = nil
 		Free(buff)
 	})
 }
 
 // 查找ID位置
-func (r *Rankings) findIndex(id string) int {
+func (r *Rankings) findIndex(id string, minValue int32) int {
 	for i, j := 0, len(r.items)-1; i <= j; i, j = i+1, j-1 {
 		if r.items[i].Id == id {
+			if r.items[i].Value < minValue {
+				return -1
+			}
 			return i
 		}
 		if r.items[j].Id == id {
+			if r.items[j].Value < minValue {
+				return -1
+			}
 			return j
 		}
 	}
