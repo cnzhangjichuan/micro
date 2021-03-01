@@ -27,6 +27,7 @@ func NewCache(expired time.Duration, saver Saver) Cache {
 // Cache 数据缓存
 type Cache interface {
 	Has(string) bool
+	WalkDisk(interface{}, func(string, interface{})) error
 	Load(Serializable, string) bool
 	Put(string, Serializable)
 	Del(string)
@@ -36,10 +37,13 @@ type Cache interface {
 // Saver 数据加载器
 type Saver interface {
 	// Save 将数据保存到指定的数据表中
-	Save(data interface{}, id string)
+	Save(interface{}, string)
 
 	// Load 从数据表中加载数据
-	Load(data interface{}, id string) bool
+	Load(interface{}, string) bool
+
+	// Walk 从数据表中迭代数据
+	Walk(interface{}, func(string, interface{})) error
 }
 
 type cache struct {
@@ -53,6 +57,15 @@ func (c *cache) Has(key string) bool {
 		return false
 	}
 	return c.cks[hashCode32(key)%c.cze].Has(key)
+}
+
+// WalkDisk 迭代数据
+func (c *cache) WalkDisk(data interface{}, p func(string, interface{})) error {
+	s := c.cks[0].saver
+	if s != nil {
+		return s.Walk(data, p)
+	}
+	return nil
 }
 
 // Load 从缓存中加载数据

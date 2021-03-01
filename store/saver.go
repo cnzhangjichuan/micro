@@ -86,6 +86,52 @@ func (s *saver) Load(data interface{}, id string) bool {
 	return err == nil
 }
 
+// walk 迭代数据
+func (s *saver) Walk(data interface{}, p func(string, interface{})) error {
+	if s == nil {
+		return nil
+	}
+	for i := 0; i < tableCount; i++ {
+		if err := s.walk(data, p, i); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// walk 迭代数据
+func (s *saver) walk(data interface{}, p func(string, interface{}), idx int) error {
+	env.RLock()
+	if env.db == nil {
+		env.RUnlock()
+		return nil
+	}
+	rs, err := env.db.Query(strings.Join([]string{`select id,value from `, s.name, strconv.Itoa(idx)}, ""))
+	env.RUnlock()
+	if err != nil {
+		return err
+	}
+	defer rs.Close()
+
+	for rs.Next() {
+		var (
+			id  string
+			buf []byte
+		)
+		if err := rs.Scan(&id, &buf); err != nil {
+			return err
+		}
+		pack := packet.NewWithData(buf)
+		err := pack.DecodeJSON(data)
+		packet.Free(pack)
+		if err != nil {
+			return err
+		}
+		p(id, data)
+	}
+	return nil
+}
+
 // NewSingleSaver 创建单表加载器
 func NewSingleSaver(name string) *singleSaver {
 	if name == "" {
