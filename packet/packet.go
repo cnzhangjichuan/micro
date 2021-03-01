@@ -316,6 +316,11 @@ func (p *Packet) Seek(readIndex, writeIndex int) {
 	}
 }
 
+// Skip 跳过一定的字节数
+func (p *Packet) Skip(count int) {
+	p.r += count
+}
+
 // ReadWhen 读取数据，直到读到dst为止
 func (p *Packet) ReadWhen(dst byte) []byte {
 	var st = p.r
@@ -347,9 +352,28 @@ func (p *Packet) Slice(s, e int) []byte {
 	return p.buf[s:e]
 }
 
+// SliceNum 获取指定数量的数据
+func (p *Packet) SliceNum(num int) []byte {
+	r := p.r
+	e := r + num
+	if e > p.w {
+		e = p.w
+	}
+	p.r = e
+	return p.buf[r:e]
+}
+
 // Data 当前数据
 func (p *Packet) Data() []byte {
 	return p.buf[p.r:p.w]
+}
+
+// CopyData
+func (p *Packet) CopyData() []byte {
+	s := p.Size()
+	cp := getBytes(s)[:s]
+	copy(cp, p.Data())
+	return cp
 }
 
 // Copy 复制当前数据

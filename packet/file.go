@@ -34,6 +34,20 @@ func NewWithFile(name string) (pack *Packet, err error) {
 	return
 }
 
+// LoadFile 加载文件内容
+func (p *Packet) LoadFile(name string) error {
+	p.Reset()
+	fd, err := os.Open(name)
+	if err != nil {
+		return err
+	}
+	buf := getBytes(1024)[:1024]
+	_, err = io.CopyBuffer(p, fd, buf)
+	putBytes(buf)
+	fd.Close()
+	return err
+}
+
 // ReadAt 实现io.ReadAt
 func (p *Packet) ReadAt(buf []byte, off int64) (n int, err error) {
 	of := int(off)

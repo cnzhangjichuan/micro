@@ -28,7 +28,7 @@ func (c *closer) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 		}
 		pack.WriteString(`service has been closed.`)
 	} else {
-		pack.WriteString(`trespassing`)
+		pack.WriteString(`bad request`)
 	}
 	pack.EndWrite()
 	pack.FlushToConn(conn)

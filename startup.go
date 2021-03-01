@@ -153,6 +153,34 @@ func findBis(api string) (bisDpo, bool) {
 	return df, ok
 }
 
+// RegisterRPC 注册业务接口RPC
+func RegisterRPC(api string, df bisDpo) {
+	const errUNKNOWN = `Unknown`
+
+	env.rps[api] = func(dpo Dpo) (resp interface{}, errCode string) {
+		defer func() {
+			err := recover()
+			if err == nil {
+				return
+			}
+			pack := packet.New(1024)
+			buf := pack.Allocate(1024)
+			buf = buf[:runtime.Stack(buf, false)]
+			Debug("\nrpc [%s] error: %v\n%s\n\n", api, err, buf)
+			packet.Free(pack)
+			errCode = errUNKNOWN
+		}()
+		resp, errCode = df(dpo)
+		return
+	}
+}
+
+// findRps 查找RPC业务
+func findRps(api string) (bisDpo, bool) {
+	rp, ok := env.rps[api]
+	return rp, ok
+}
+
 // processConn 处理请求
 func processConn(conn net.Conn) {
 	const TIMEOUT = time.Second * 3

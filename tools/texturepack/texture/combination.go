@@ -238,6 +238,7 @@ func (p *PngCombination) saveItems(items ImageItems, dstName string, pack *packe
 			pack.WriteU32(uint32(items[i].Offset.Min.Y))
 			pack.WriteU32(uint32(items[i].Offset.Dx()))
 			pack.WriteU32(uint32(items[i].Offset.Dy()))
+			println(items[i].Name, items[i].Offset.Min.X, items[i].Offset.Min.Y, items[i].Offset.Dx(), items[i].Offset.Dy())
 		}
 		fd, err := os.Create(filepath.Join(p.oDir, fileName))
 		if err != nil {

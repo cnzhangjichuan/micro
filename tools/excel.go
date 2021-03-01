@@ -99,7 +99,7 @@ func ExcelAutoReadFromCache(pack *packet.Packet, onSetup OnSetupFunc) {
 
 // ExcelSaveTo 将Excel数据保存到指定的文件中
 func ExcelSaveTo(r io.Reader, dst string) error {
-	return ExcelSaveToWithTypeIndex(r, dst, 3)
+	return ExcelSaveToWithTypeIndex(r, dst, 2)
 }
 
 // ExcelSaveToWithTypeIndex 将Excel数据保存到指定的文件中

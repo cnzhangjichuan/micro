@@ -113,7 +113,7 @@ func requestUploadService(api, fileName, remoteAddress string) error {
 		path = remoteAddress[i:]
 		remoteAddress = remoteAddress[:i]
 	}
-	conn, err := net.DialTimeout("tcp", remoteAddress, time.Second)
+	conn, err := net.DialTimeout("tcp", remoteAddress, time.Second*3)
 	if err != nil {
 		fd.Close()
 		return errors.New("service not found, it may be closed")
@@ -123,9 +123,9 @@ func requestUploadService(api, fileName, remoteAddress string) error {
 
 	// 发送请求
 	if path != "" {
-		pack.Write([]byte(`GET `+path+` HTTP/1.1`))
+		pack.Write([]byte(`GET ` + path + ` HTTP/1.1`))
 		pack.Write(httpRowAt)
-		pack.Write([]byte(`Host: `+remoteAddress))
+		pack.Write([]byte(`Host: ` + remoteAddress))
 		pack.Write(httpRowAt)
 	}
 	pack.Write([]byte("Upgrade: uploader"))

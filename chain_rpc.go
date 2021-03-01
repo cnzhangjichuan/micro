@@ -329,7 +329,7 @@ func (r *rpc) handAPIData(pc *rpcPackConn) {
 		api     = pc.pack.ReadString()
 	)
 
-	f, ok := findBis(api)
+	f, ok := findRps(api)
 	if !ok {
 		errCode = apiNotFoundError.ErrCode
 	} else {
