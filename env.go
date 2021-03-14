@@ -50,9 +50,6 @@ var env struct {
 	bis map[string]bisDpo
 	rps map[string]bisDpo
 
-	// 重载函数
-	reloadFunc []func()
-
 	// 服务器关闭之前执行的函数
 	closeFunc []func()
 
@@ -72,7 +69,6 @@ func init() {
 	// 业务接口
 	env.bis = make(map[string]bisDpo, 64)
 	env.rps = make(map[string]bisDpo, 64)
-	env.reloadFunc = make([]func(), 0, 16)
 	env.uploadFunc = make(map[string]uploadFunc, 16)
 }
 

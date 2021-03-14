@@ -100,7 +100,6 @@ func createService(onStartup func()) (net.Listener, error) {
 		&websocket{},
 		&env.registry,
 		&closer{},
-		&reloader{},
 		&uploader{},
 	}
 	for i := 0; i < len(env.chains); i++ {

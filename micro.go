@@ -7,16 +7,10 @@ import (
 
 // Service 开启服务
 func Service(onStartup func()) error {
-	var cmd, op, param string
+	var cmd string
 	for i := 1; i < len(os.Args); i++ {
 		if os.Args[i-1] == "-s" {
 			cmd = strings.TrimSpace(os.Args[i])
-			if len(os.Args) > i+1 {
-				op = os.Args[i+1]
-			}
-			if len(os.Args) > i+2 {
-				param = os.Args[i+2]
-			}
 			break
 		}
 	}
@@ -26,24 +20,14 @@ func Service(onStartup func()) error {
 		// 启动服务
 		return startupService(onStartup)
 
-	case `reload`:
-		// 重载服务配置
-		return requestReloadService()
-
 	case `stop`:
 		// 关闭服务
 		return requestCloseService()
 
-	case `upload`:
-		// 上传文件
-		return requestUploadService(op, param, localeAddress())
-
 	case `help`:
 		Log("\n" +
 			"-s start: startup service\n" +
-			"-s stop: shutdown running service\n" +
-			"-s reload: reload config file\n" +
-			"-s upload: upload file\n")
+			"-s stop: shutdown running service\n")
 		return nil
 	}
 }
