@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"hash/crc32"
+	"io"
 	"math/rand"
 	"os"
 	"strconv"
@@ -549,6 +550,9 @@ func ReadLineFile(name string, lc func(string) error) error {
 		if len(line) > 0 {
 			err = lc(string(bytes.TrimSpace(line)))
 		}
+	}
+	if err == io.EOF {
+		err = nil
 	}
 	return err
 }
