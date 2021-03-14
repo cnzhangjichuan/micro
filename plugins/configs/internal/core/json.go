@@ -1,4 +1,4 @@
-package config
+package core
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 )
 
 // ToJSON 转换成Json
-func (e *excel) ToJSON(src, dst string) error {
+func (s *Service) ToJSON(src, dst string) error {
 	os.MkdirAll(dst, os.ModePerm)
 
 	// 处理目录文件
@@ -24,11 +24,11 @@ func (e *excel) ToJSON(src, dst string) error {
 			return nil
 		}
 		name := xutils.ParseFileName(info.Name())
-		return e.toJSON(path, filepath.Join(dst, name+".js"))
+		return s.toJSON(path, filepath.Join(dst, name+".js"))
 	})
 }
 
-func (e *excel) toJSON(src, dst string) error {
+func (s *Service) toJSON(src, dst string) error {
 	const dataStartIndex = 3
 
 	xf, err := xlsx.OpenFile(src)
@@ -57,7 +57,7 @@ func (e *excel) toJSON(src, dst string) error {
 			continue
 		}
 		typ := types[c].String()
-		if !e.isClientField(typ) {
+		if !s.isClientField(typ) {
 			continue
 		}
 		if !first {

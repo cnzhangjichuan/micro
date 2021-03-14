@@ -1,4 +1,4 @@
-package config
+package core
 
 import (
 	"errors"
@@ -10,11 +10,11 @@ import (
 type OnSetupFunc func(int) interface{}
 
 // Load 加载数据
-func (e *excel) Load(name string, onSetup OnSetupFunc) error {
-	e.RLock()
-	defer e.RUnlock()
+func (s *Service) Load(name string, onSetup OnSetupFunc) error {
+	s.m.RLock()
+	defer s.m.RUnlock()
 
-	pack, err := packet.NewWithFile(e.path)
+	pack, err := packet.NewWithFile(s.path)
 	if err != nil {
 		return errors.New(`excel: ` + err.Error())
 	}

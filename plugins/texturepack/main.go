@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/micro/packet"
-	"github.com/micro/tools/texturepack/texture"
+	"github.com/micro/plugins/texturepack/texture"
 )
 
 func main() {

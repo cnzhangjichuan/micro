@@ -1,4 +1,4 @@
-package config
+package core
 
 import (
 	"errors"
@@ -12,7 +12,7 @@ import (
 )
 
 // ToLua 转换成lua文件
-func (e *excel) ToLua(src, dst string) error {
+func (s *Service) ToLua(src, dst string) error {
 	os.MkdirAll(dst, os.ModePerm)
 
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
@@ -23,11 +23,11 @@ func (e *excel) ToLua(src, dst string) error {
 			return nil
 		}
 		name := xutils.ParseFileName(info.Name())
-		return e.toLua(path, filepath.Join(dst, name+".lua"))
+		return s.toLua(path, filepath.Join(dst, name+".lua"))
 	})
 }
 
-func (e *excel) toLua(src, dst string) error {
+func (s *Service) toLua(src, dst string) error {
 	const dataStartIndex = 3
 
 	xf, err := xlsx.OpenFile(src)
@@ -54,7 +54,7 @@ func (e *excel) toLua(src, dst string) error {
 			continue
 		}
 		sty := types.Cells[i].String()
-		if !e.isClientField(sty) {
+		if !s.isClientField(sty) {
 			continue
 		}
 		fd.WriteString(name)
@@ -90,13 +90,4 @@ func (e *excel) toLua(src, dst string) error {
 	fd.WriteString(`}`)
 
 	return nil
-}
-
-func (e *excel) isClientField(typ string) bool {
-	switch typ {
-	default:
-		return false
-	case typeString, typeCString, typeFloat, typeCFloat, typeInt, typeCInt, typeDate, typeCDate:
-		return true
-	}
 }

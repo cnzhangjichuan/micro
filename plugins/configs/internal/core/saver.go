@@ -1,4 +1,4 @@
-package config
+package core
 
 import (
 	"errors"
@@ -10,11 +10,11 @@ import (
 )
 
 // Save 更新数据
-func (e *excel) Save(name string, r io.Reader) error {
+func (s *Service) Save(name string, r io.Reader) error {
 	const dataStartIndex = 3
 
-	e.Lock()
-	defer e.Unlock()
+	s.m.Lock()
+	defer s.m.Unlock()
 
 	pack, err := packet.NewWithReader(r)
 	if err != nil {
@@ -37,7 +37,7 @@ func (e *excel) Save(name string, r io.Reader) error {
 	pack.Reset()
 
 	// 设置列名信息
-	names, types := e.title(rows)
+	names, types := s.title(rows)
 	pack.WriteStrings(names)
 
 	// 设置数据大小
@@ -53,14 +53,14 @@ func (e *excel) Save(name string, r io.Reader) error {
 
 	// 写入行数据
 	for i := int64(0); i < realRows; i++ {
-		e.write(pack, rows[dataStartIndex+i], types)
+		s.write(pack, rows[dataStartIndex+i], types)
 	}
 	data := pack.CopyData()
 
 	// 替换当前数据
 	out := packet.New(4096)
 	replaced := false
-	if err = pack.LoadFile(e.path); err == nil {
+	if err = pack.LoadFile(s.path); err == nil {
 		for {
 			n := pack.ReadString()
 			if n == "" {
@@ -90,13 +90,13 @@ func (e *excel) Save(name string, r io.Reader) error {
 		out.Write(data)
 	}
 
-	err = out.SaveToFile(e.path)
+	err = out.SaveToFile(s.path)
 	packet.Free(out)
 	return err
 }
 
 // title 获取表头信息
-func (e *excel) title(rows []*xlsx.Row) (names, types []string) {
+func (s *Service) title(rows []*xlsx.Row) (names, types []string) {
 	const (
 		nameRowIndex = 1
 		typeRowIndex = 2
@@ -130,7 +130,7 @@ func (e *excel) title(rows []*xlsx.Row) (names, types []string) {
 }
 
 // write 将一行内容写入到packet中
-func (e *excel) write(pack *packet.Packet, row *xlsx.Row, types []string) {
+func (s *Service) write(pack *packet.Packet, row *xlsx.Row, types []string) {
 	var (
 		cells = row.Cells
 		cls   = len(cells)

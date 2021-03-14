@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	
-	"github.com/micro/tools/config"
+	"github.com/micro/plugins/configs/internal/core"
 )
 
 func main() {
-	err := config.ToLua(`../Tables`, `../LuaScript/config`)
+	var c core.Service
+
+	err := c.ToLua(`../Tables`, `../LuaScript/config`)
 	if err != nil {
 		fmt.Println("数据转化失败: ", err)
 	} else {

@@ -1,8 +1,11 @@
 package xutils
 
 import (
+	"bufio"
+	"bytes"
 	"hash/crc32"
 	"math/rand"
+	"os"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -528,4 +531,24 @@ func RandMinMax(min, max int32) int32 {
 		return min
 	}
 	return min + rand.Int31n(max-min+1)
+}
+
+// ReadLineFile 按行读取文件
+func ReadLineFile(name string, lc func(string) error) error {
+	fd, err := os.Open(name)
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+
+	b := bufio.NewReader(fd)
+
+	var line []byte
+	for err == nil {
+		line, _, err = b.ReadLine()
+		if len(line) > 0 {
+			err = lc(string(bytes.TrimSpace(line)))
+		}
+	}
+	return err
 }
