@@ -137,3 +137,133 @@ func (s *SFF32) Ratio(name string, ratio float32) bool {
 func (s *SFF32) GetName() string {
 	return s.s
 }
+
+// I32S
+type I32S struct {
+	v []int32
+}
+
+func (s *I32S) Parse(nvv string) {
+	if nvv == "" {
+		return
+	}
+	var ss []string
+	if strings.Index(nvv, ";") >= 0 {
+		ss = strings.Split(nvv, ";")
+	} else {
+		ss = strings.Split(nvv, ",")
+	}
+	if len(ss) < 1 {
+		return
+	}
+	s.v = make([]int32, 0, len(ss))
+	for _, v := range ss {
+		s.v = append(s.v, ParseI32(v, 0))
+	}
+}
+
+func (s *I32S) Get(x int) (int32, bool) {
+	l := len(s.v)
+	if l == 0 {
+		return 0, false
+	}
+	if x < 0 {
+		return s.v[0], false
+	}
+	ok := true
+	if x >= l {
+		x = l - 1
+		ok = false
+	}
+	return s.v[x], ok
+}
+
+func (s *I32S) Len() int {
+	return len(s.v)
+}
+
+// F32S
+type F32S struct {
+	v []float32
+}
+
+func (s *F32S) Parse(nvv string) {
+	if nvv == "" {
+		return
+	}
+	var ss []string
+	if strings.Index(nvv, ";") >= 0 {
+		ss = strings.Split(nvv, ";")
+	} else {
+		ss = strings.Split(nvv, ",")
+	}
+	if len(ss) < 1 {
+		return
+	}
+	s.v = make([]float32, 0, len(ss))
+	for _, v := range ss {
+		s.v = append(s.v, ParseF32(v, 0))
+	}
+}
+
+func (s *F32S) Get(x int) (float32, bool) {
+	l := len(s.v)
+	if l == 0 {
+		return 0, false
+	}
+	if x < 0 {
+		return s.v[0], false
+	}
+
+	ok := true
+	if x >= l {
+		x = l - 1
+		ok = false
+	}
+	return s.v[x], ok
+}
+
+func (s *F32S) Len() int {
+	return len(s.v)
+}
+
+// SS
+type SS struct {
+	v []string
+}
+
+func (s *SS) Parse(nvv string) {
+	if nvv == "" {
+		return
+	}
+	if strings.Index(nvv, ";") >= 0 {
+		s.v = strings.Split(nvv, ";")
+	} else {
+		s.v = strings.Split(nvv, ",")
+	}
+}
+
+func (s *SS) Get(x int) (string, bool) {
+	l := len(s.v)
+	if l == 0 {
+		return "", false
+	}
+	if x < 0 {
+		return s.v[0], false
+	}
+
+	ok := true
+	if x >= l {
+		x = l - 1
+		ok = false
+	}
+	return s.v[x], ok
+}
+
+func (s *SS) GetValues() []string {
+	return s.v
+}
+
+func (s *SS) Len() int {
+	return len(s.v)
+}
