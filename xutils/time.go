@@ -43,6 +43,12 @@ func Now() time.Time {
 	return time.Now()
 }
 
+// 获取当天的零点时间点
+func NowZero() int64 {
+	now := NowSec()
+	return now - now%daySec
+}
+
 // NowSec 当前秒数
 func NowSec() int64 {
 	return Now().Unix() + offsetInDay

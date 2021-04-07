@@ -526,6 +526,18 @@ func RandSortI32(i32s []int32, start int) {
 	}
 }
 
+// RandString 将数组乱序
+func RandString(ss []string, start int) {
+	l := len(ss)
+	if start < 0 {
+		start = 0
+	}
+	for i := start; i < l; i++ {
+		w := rand.Intn(l)
+		ss[i], ss[w] = ss[w], ss[i]
+	}
+}
+
 // RandMinMax 获取min到max之间的随机值
 func RandMinMax(min, max int32) int32 {
 	if min >= max {
