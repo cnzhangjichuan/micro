@@ -182,6 +182,50 @@ func (s *I32S) Len() int {
 	return len(s.v)
 }
 
+// I64S
+type I64S struct {
+	v []int64
+}
+
+func (s *I64S) Parse(nvv string) {
+	if nvv == "" {
+		return
+	}
+	var ss []string
+	if strings.Index(nvv, ";") >= 0 {
+		ss = strings.Split(nvv, ";")
+	} else {
+		ss = strings.Split(nvv, ",")
+	}
+	if len(ss) < 1 {
+		return
+	}
+	s.v = make([]int64, 0, len(ss))
+	for _, v := range ss {
+		s.v = append(s.v, ParseI64(v, 0))
+	}
+}
+
+func (s *I64S) Get(x int) (int64, bool) {
+	l := len(s.v)
+	if l == 0 {
+		return 0, false
+	}
+	if x < 0 {
+		return s.v[0], false
+	}
+	ok := true
+	if x >= l {
+		x = l - 1
+		ok = false
+	}
+	return s.v[x], ok
+}
+
+func (s *I64S) Len() int {
+	return len(s.v)
+}
+
 // F32S
 type F32S struct {
 	v []float32

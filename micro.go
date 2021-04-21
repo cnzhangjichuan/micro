@@ -51,8 +51,18 @@ func SendDataWithGroup(data interface{}, api string, flag uint8, group string) {
 	}
 }
 
-// RPC 远端调用
-func RPC(out, in interface{}, srvName, api string) error {
+// RPCCenter 远端调用(中心服)
+func RPCCenter(api string, in, out interface{}) error {
+	adr := env.config.Registry
+	if adr == "" {
+		return errRPCNotFoundService
+	}
+
+	return env.rpc.Call(out, in, adr, api)
+}
+
+// RPC 远端调用(指定有服务器)
+func RPC(srvName, api string, in, out interface{}) error {
 	adr := env.registry.ServerAddress(srvName)
 	if adr == "" {
 		return errRPCNotFoundService

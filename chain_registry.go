@@ -101,9 +101,7 @@ func (r *registry) ServerAddress(name string) string {
 	as, ok := r.addresses[name]
 	if !ok {
 		r.RUnlock()
-		// 如果没有找到注册的服务
-		// 使用注册服的地址
-		return env.config.Registry
+		return ""
 	}
 	l := len(as.ads)
 	if l == 0 {

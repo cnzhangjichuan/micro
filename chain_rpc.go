@@ -140,10 +140,12 @@ func (r *rpc) Call(out, in interface{}, adr, api string) error {
 	pack.WriteU32(rpcCodeRequest)
 	pack.WriteU64(msgID)
 	pack.WriteString(api)
-	if i, ok := in.(packet.Encoder); ok {
-		i.Encode(pack)
-	} else {
-		pack.EncodeJSON(in, true, true)
+	if in != nil {
+		if i, ok := in.(packet.Encoder); ok {
+			i.Encode(pack)
+		} else {
+			pack.EncodeJSON(in, true, true)
+		}
 	}
 	pack.EndWrite()
 

@@ -34,6 +34,15 @@ func NewWithFile(name string) (pack *Packet, err error) {
 	return
 }
 
+// LoadFromReader 从流中加载数据
+func (p *Packet) LoadFromReader(r io.Reader) error {
+	p.Reset()
+	buf := getBytes(1024)[:1024]
+	_, err := io.CopyBuffer(p, r, buf)
+	putBytes(buf)
+	return err
+}
+
 // LoadFile 加载文件内容
 func (p *Packet) LoadFile(name string) error {
 	p.Reset()

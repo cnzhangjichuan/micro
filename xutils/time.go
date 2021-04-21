@@ -2,87 +2,97 @@ package xutils
 
 import "time"
 
-var (
-	zero        = time.Date(1970, 1, 1, 0, 0, 0, 0, time.Local)
-	offsetInDay = 0 - zero.Unix()
-)
+// 开服时间
+var openingTime = time.Date(1970, 1, 1, 6, 0, 0, 0, time.Local)
+
+// SetOpeningTime 设置开服时间
+func SetOpeningTime(year, month, day, hour int) {
+	openingTime = time.Date(year, time.Month(month), day, hour, 0, 0, 0, time.Local)
+}
 
 const (
-	daySec  = 86400
-	weekSec = 604800
+	daySec       = 86400
+	dayDuration  = time.Hour * 24
+	weekDuration = 7 * dayDuration
 )
-
-// DaysNow 已过天数
-func DaysNow() int32 {
-	return DaysWithStamp(NowSec())
-}
-
-// Days 已过天数
-func Days(t time.Time) int32 {
-	return DaysWithStamp(t.Unix())
-}
-
-// DaysWithStamp 已过天数
-func DaysWithStamp(stamp int64) int32 {
-	return int32(stamp / daySec)
-}
-
-// DaysWithDateString 已过天数
-func DaysWithDateString(value string) int32 {
-	const layout = `2006/01/02`
-
-	t, err := ParseTimeWithLayout(layout, value)
-	if err != nil {
-		return 0
-	}
-	return DaysWithStamp(t)
-}
 
 // 当前时间
 func Now() time.Time {
 	return time.Now()
 }
 
-// 获取当天的零点时间点
-func NowZero() int64 {
-	now := NowSec()
-	return now - now%daySec
+// Days 已过天数
+func Days(t time.Time) int32 {
+	return int32(t.Sub(openingTime) / dayDuration)
+}
+
+// DaysNow 当前已过天数
+func DaysNow() int32 {
+	return int32(Now().Sub(openingTime) / dayDuration)
+}
+
+// DaysWithDateString 已过天数
+func DaysWithDateString(value string) int32 {
+	const layout = `2006/01/02`
+
+	t, err := time.Parse(layout, value)
+	if err != nil {
+		return 0
+	}
+	return Days(t)
+}
+
+// Weeks 已过周数
+func Weeks(t time.Time) int32 {
+	return int32(t.Sub(openingTime) / weekDuration)
+}
+
+// WeeksNow 当前已过周数
+func WeeksNow() int32 {
+	return int32(Now().Sub(openingTime) / weekDuration)
 }
 
 // NowSec 当前秒数
 func NowSec() int64 {
-	return Now().Unix() + offsetInDay
+	return Now().Unix()
 }
 
 // TodaySec 今天已过的秒数
 func TodaySec() int32 {
-	return int32(NowSec() % daySec)
+	now := Now()
+	return int32(now.Hour()*3600 + now.Minute()*60 + now.Second())
 }
 
-// WeekNow 当前周
-func WeekNow() int32 {
-	return WeeksWithStamp(NowSec())
+// SecondSineDay 从过去指定的天数始，距离现在已过的秒数
+func SecondSineDay(day int32) int32 {
+	return int32(NowSec() - openingTime.Add(time.Duration(day)*dayDuration).Unix())
 }
 
-// WeeksWithStamp 已过周数
-func WeeksWithStamp(stamp int64) int32 {
-	return int32(stamp / weekSec)
+// SecondToNextOpeningTime 距离下一个开放时间点的秒数
+func SecondToNextOpeningTime(day int32) (sec int32) {
+	nowSec := TodaySec()
+	refreshAt := int32(openingTime.Hour()*3600 + openingTime.Minute()*60 + openingTime.Second())
+	if day <= 0 {
+		if nowSec <= refreshAt {
+			sec = refreshAt - nowSec
+			return
+		}
+		sec = refreshAt + daySec - nowSec
+		return
+	}
+	sec = refreshAt + daySec - nowSec
+	sec += daySec * (day - 1)
+	return
 }
 
 // ParseTime 时间转换
 func ParseTime(value string) (int64, error) {
 	const layout = `2006/01/02 15:04`
-
-	return ParseTimeWithLayout(layout, value)
-}
-
-// ParseTimeWithLayout 时间转换
-func ParseTimeWithLayout(layout, value string) (int64, error) {
-	t, err := time.ParseInLocation(layout, value, time.Local)
+	t, err := time.Parse(layout, value)
 	if err != nil {
 		return 0, err
 	}
-	return t.Unix(), nil
+	return t.Unix(), err
 }
 
 // FormatNow 当前日期YMD
@@ -95,6 +105,11 @@ func FormatNow() string {
 // DayInMonth 月中第几天
 func DaysOfMonth() int32 {
 	return int32(Now().Day())
+}
+
+// MonthOfYear 一年中的月份
+func MonthOfYear() int32 {
+	return int32(Now().Month())
 }
 
 // SETime 起止时段

@@ -40,13 +40,15 @@ func (a *authorize) NewCode(code string) string {
 	}
 
 	pack := packet.New(512)
+	// add code
 	pack.WriteString(code)
 	ls := pack.Size()
+	// add timestamp
 	binary.BigEndian.PutUint64(pack.Allocate(8), uint64(time.Now().Unix()))
-
-	// mask
-	pack.Mask(a.mask, 0, pack.Size())
+	// sign
 	sign := md5.Sum(pack.Data())
+	// mask
+	pack.Mask(a.mask, 0, ls)
 
 	// append md5 code
 	pack.Seek(0, ls)
@@ -96,13 +98,11 @@ func (a *authorize) Check(as string) (code string, ok bool) {
 	for i := now; i >= dsw; i-- {
 		pack.Seek(0, sdx)
 		binary.BigEndian.PutUint64(pack.Allocate(8), i)
-		pack.Mask(a.mask, 0, last)
 		sign := md5.Sum(pack.Slice(0, last))
 		if bytes.Equal(vCode, sign[:]) {
 			ok = true
 			break
 		}
-		pack.Mask(a.mask, 0, sdx)
 	}
 	packet.Free(pack)
 
@@ -113,10 +113,12 @@ func (a *authorize) Check(as string) (code string, ok bool) {
 func (a *authorize) NewToken(s string) string {
 	pack := packet.New(512)
 	pack.WriteString(s)
-	// mask
-	pack.Mask(a.mask, 0, pack.Size())
+	size := pack.Size()
+	// sign
 	sign := md5.Sum(pack.Data())
 	pack.Write(sign[:])
+	// mask
+	pack.Mask(a.mask, 0, size)
 
 	// hex encode
 	src := pack.Data()
@@ -145,15 +147,14 @@ func (a *authorize) CheckToken(as string) (token string, ok bool) {
 
 	// md5 code
 	sdx := pack.Size() - md5.Size
-	vCode := pack.Slice(sdx, -1)
+	pack.Mask(a.mask, 0, sdx)
 	sign := md5.Sum(pack.Slice(0, sdx))
-	if !bytes.Equal(sign[:], vCode) {
+	if !bytes.Equal(sign[:], pack.Slice(sdx, -1)) {
 		packet.Free(pack)
 		return
 	}
 
 	// unmask
-	pack.Mask(a.mask, 0, sdx)
 	token, ok = pack.ReadString(), true
 	packet.Free(pack)
 	return
