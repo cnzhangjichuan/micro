@@ -123,6 +123,12 @@ func (s *SI32) AddAll(i *SI32) {
 	s.i32 = append(s.i32, i.i32...)
 }
 
+// AddAllCost 添加数据
+func (s *SI32) AddAllCost(i *Cost) {
+	s.str = append(s.str, i.str...)
+	s.i32 = append(s.i32, i.i32...)
+}
+
 // Merge 添加数据
 func (s *SI32) Merge(n string, i int32) {
 	for x := 0; x < len(s.str); x++ {
@@ -136,6 +142,14 @@ func (s *SI32) Merge(n string, i int32) {
 
 // MergeAll 添加数据
 func (s *SI32) MergeAll(i *SI32) {
+	for x := 0; x < i.Len(); x++ {
+		n, v := i.Get(x)
+		s.Merge(n, v)
+	}
+}
+
+// MergeAllCost 添加数据
+func (s *SI32) MergeAllCost(i *Cost) {
 	for x := 0; x < i.Len(); x++ {
 		n, v := i.Get(x)
 		s.Merge(n, v)

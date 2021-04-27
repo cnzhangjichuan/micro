@@ -260,8 +260,7 @@ func HasString(arr []string, item string) bool {
 
 // IndexStrings 元素在列表中的位置
 func IndexStrings(arr []string, item string) int {
-	al := len(arr)
-	for i := 0; i < al; i++ {
+	for i, al := 0, len(arr); i < al; i++ {
 		if arr[i] == item {
 			return i
 		}
@@ -271,8 +270,7 @@ func IndexStrings(arr []string, item string) int {
 
 // IndexI32 元素在列表中的位置
 func IndexI32(arr []int32, item int32) int {
-	al := len(arr)
-	for i := 0; i < al; i++ {
+	for i, al := 0, len(arr); i < al; i++ {
 		if arr[i] == item {
 			return i
 		}
@@ -308,8 +306,7 @@ func EqualF32(s1, s2 []float32) bool {
 
 // HasU32 是否含有指定元素
 func HasU32(arr []uint32, item uint32) bool {
-	al := len(arr)
-	for i := 0; i < al; i++ {
+	for i, al := 0, len(arr); i < al; i++ {
 		if arr[i] == item {
 			return true
 		}
@@ -319,8 +316,7 @@ func HasU32(arr []uint32, item uint32) bool {
 
 // HasU64 是否含有指定元素
 func HasU64(arr []uint64, item uint64) bool {
-	al := len(arr)
-	for i := 0; i < al; i++ {
+	for i, al := 0, len(arr); i < al; i++ {
 		if arr[i] == item {
 			return true
 		}
@@ -330,8 +326,7 @@ func HasU64(arr []uint64, item uint64) bool {
 
 // HasI32 是否含有指定元素
 func HasI32(arr []int32, item int32) bool {
-	al := len(arr)
-	for i := 0; i < al; i++ {
+	for i, al := 0, len(arr); i < al; i++ {
 		if arr[i] == item {
 			return true
 		}
@@ -341,8 +336,7 @@ func HasI32(arr []int32, item int32) bool {
 
 // HasI64 是否含有指定元素
 func HasI64(arr []int64, item int64) bool {
-	al := len(arr)
-	for i := 0; i < al; i++ {
+	for i, al := 0, len(arr); i < al; i++ {
 		if arr[i] == item {
 			return true
 		}
@@ -352,8 +346,7 @@ func HasI64(arr []int64, item int64) bool {
 
 // HasInt 是否含有指定元素
 func HasInt(arr []int, item int) bool {
-	al := len(arr)
-	for i := 0; i < al; i++ {
+	for i, al := 0, len(arr); i < al; i++ {
 		if arr[i] == item {
 			return true
 		}
@@ -363,8 +356,7 @@ func HasInt(arr []int, item int) bool {
 
 // HasF32 是否含有指定元素
 func HasF32(arr []float32, item float32) bool {
-	al := len(arr)
-	for i := 0; i < al; i++ {
+	for i, al := 0, len(arr); i < al; i++ {
 		if arr[i] == item {
 			return true
 		}
@@ -374,8 +366,7 @@ func HasF32(arr []float32, item float32) bool {
 
 // HasF64 是否含有指定元素
 func HasF64(arr []float64, item float64) bool {
-	al := len(arr)
-	for i := 0; i < al; i++ {
+	for i, al := 0, len(arr); i < al; i++ {
 		if arr[i] == item {
 			return true
 		}
@@ -385,7 +376,7 @@ func HasF64(arr []float64, item float64) bool {
 
 // RemoveSS 从[]string中删除指定的元素
 func RemoveSS(ss []string, s string) []string {
-	for i := 0; i < len(ss); i++ {
+	for i, l := 0, len(ss); i < l; i++ {
 		if ss[i] == s {
 			copy(ss[i:], ss[i+1:])
 			ss = ss[:len(ss)-1]

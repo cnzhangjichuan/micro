@@ -25,8 +25,9 @@ func (s *Growth) Parse(nv string) {
 
 // Get 获取指定位置的数据
 func (s *Growth) Get(x int32) float32 {
-	if x < 0 || x >= int32(len(s.f32)) {
+	i := int(x - 1)
+	if i < 0 || i >= len(s.f32) {
 		return 1
 	}
-	return s.f32[x]
+	return s.f32[i]
 }
