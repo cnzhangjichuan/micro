@@ -79,10 +79,10 @@ func (s *Costs) Parse(nv string) {
 }
 
 // Get 获取消耗
-func (s *Costs) Get(x int32) *Cost {
+func (s *Costs) Get(x int32) SI32 {
 	i := int(x - 1)
 	if i < 0 || i >= len(s.cc) {
-		return nil
+		return SI32{}
 	}
-	return &s.cc[i]
+	return s.cc[i].SI32()
 }

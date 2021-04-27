@@ -102,8 +102,15 @@ func (s *SI32) RatioOnly(r float32, nn string) (cpy SI32, ok bool) {
 	return
 }
 
-// Ratio 将数量折上一定的系数
-func (s *SI32) RatioThis(nn string, r float32) {
+// RatioThis 将数量折上一定的系数
+func (s *SI32) RatioThis(r float32) {
+	for x := 0; x < s.Len(); x++ {
+		s.i32[x] = int32(float32(s.i32[x]) * r)
+	}
+}
+
+// RatioThisName 将数量折上一定的系数
+func (s *SI32) RatioThisName(nn string, r float32) {
 	for x := 0; x < s.Len(); x++ {
 		if s.str[x] == nn {
 			s.i32[x] = int32(float32(s.i32[x]) * r)

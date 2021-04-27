@@ -17,10 +17,6 @@ func Register(rootUrl string) {
 
 	// 版本校验
 	micro.Register(api, srv.CheckVersion)
-
-	// 重载版本配置
-	micro.RegisterReloadFunc(srv.ReloadVersionFiles)
-
 	// 文件上传
 	micro.RegisterUploadFunc(api, srv.UploadFile)
 }
