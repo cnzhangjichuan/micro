@@ -2,16 +2,21 @@ package xutils
 
 import "time"
 
+// 计算当天已过秒数
+func overSeconds(t time.Time) int32 {
+	return int32(t.Hour()*3600 + t.Minute()*60 + t.Second())
+}
+
 // 开服时间
 var (
-	openingTime = time.Date(1970, 1, 1, 6, 0, 0, 0, time.Local)
-	seDayAt     = int32(openingTime.Hour()*3600 + openingTime.Minute()*60 + openingTime.Second())
+	openingTime = time.Date(2021, 1, 1, 6, 0, 0, 0, time.Local)
+	seDayAt     = overSeconds(openingTime)
 )
 
 // SetOpeningTime 设置开启时间
 func SetOpeningTime(year, month, day, hour int) {
 	openingTime = time.Date(year, time.Month(month), day, hour, 0, 0, 0, time.Local)
-	seDayAt = int32(openingTime.Hour()*3600 + openingTime.Minute()*60 + openingTime.Second())
+	seDayAt = overSeconds(openingTime)
 }
 
 const (
@@ -24,14 +29,19 @@ func Now() time.Time {
 	return time.Now()
 }
 
-// Days 已过天数
-func Days(t time.Time) int32 {
-	return int32(t.Sub(openingTime) / dayDuration)
+// NowSec 当前秒数
+func NowSec() int64 {
+	return Now().Unix()
 }
 
-// DaysNow 当前已过天数
+// Days 已过天数
+func Days(t time.Time) int32 {
+	return int32(t.Sub(openingTime)/dayDuration) + 1
+}
+
+// DaysNow 已过天数(今天)
 func DaysNow() int32 {
-	return int32(Now().Sub(openingTime) / dayDuration)
+	return Days(Now())
 }
 
 // DaysWithDateString 已过天数
@@ -47,38 +57,48 @@ func DaysWithDateString(value string) int32 {
 
 // Weeks 已过周数
 func Weeks(t time.Time) int32 {
-	return int32(t.Sub(openingTime) / weekDuration)
+	return int32(t.Sub(openingTime)/weekDuration) + 1
 }
 
 // WeeksNow 当前已过周数
 func WeeksNow() int32 {
-	return int32(Now().Sub(openingTime) / weekDuration)
+	return Weeks(Now())
 }
 
-// NowSec 当前秒数
-func NowSec() int64 {
-	return Now().Unix()
+// WeekDays 周内的天数(以开服时间为准)
+func WeekDays(t time.Time) int32 {
+	dur := t.Sub(openingTime) / dayDuration
+	days := dur%7 + 1
+	return int32(days)
+}
+
+// WeekDaysNow 周内的天数(以开服时间为准)
+func WeekDaysNow() int32 {
+	return WeekDays(Now())
 }
 
 // TodaySec 今天已过的秒数
 func TodaySec() int32 {
-	now := Now()
-	return int32(now.Hour()*3600 + now.Minute()*60 + now.Second())
+	return overSeconds(Now())
 }
 
-// SecondSineDay 从过去指定的天数始，距离现在已过的秒数
-func SecondSineDay(day int32) int32 {
-	return int32(NowSec() - openingTime.Add(time.Duration(day)*dayDuration).Unix())
-}
-
-// SecondToNextOpeningTime 距离下一个开放时间点的秒数
-func SecondToNextOpeningTime(day int32) (sec int32) {
-	sec = seDayAt - TodaySec()
-	if sec < 0 {
-		sec += 86400
+// SecondsToTomorrow 距离明天的秒数
+func SecondsToTomorrow() int32 {
+	sec := overSeconds(Now())
+	if sec <= seDayAt {
+		return seDayAt - sec
 	}
-	sec += 86400 * day
-	return
+	return seDayAt + 86400 - sec
+}
+
+// SecondsPastOpeningTime 从过去指定的天数始，距离现在已过的秒数
+func SecondsPastOpeningTime(days int32) int32 {
+	return int32(NowSec() - openingTime.Add(time.Duration(days)*dayDuration).Unix())
+}
+
+// SecondsFutureOpeningTime 距离下一个开放时间点的秒数
+func SecondsFutureOpeningTime(days int32) int32 {
+	return int32(openingTime.Add(dayDuration*time.Duration(days)).Unix() - NowSec())
 }
 
 // ParseTime 时间转换

@@ -8,6 +8,7 @@ import (
 
 	"github.com/micro/packet"
 	"github.com/micro/store"
+	"github.com/micro/xutils"
 )
 
 // startupService 启动服务
@@ -67,6 +68,13 @@ func createService(onStartup func()) (net.Listener, error) {
 	// Session会话
 	if env.config.Expired < 0 {
 		env.config.Expired = 0
+	}
+
+	// 设置开服时间
+	if env.config.OpenAt != "" {
+		if ats := xutils.ParseIS(env.config.OpenAt); len(ats) == 4 {
+			xutils.SetOpeningTime(ats[0], ats[1], ats[2], ats[3])
+		}
 	}
 
 	// 数据存储

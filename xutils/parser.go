@@ -57,6 +57,8 @@ func ParseBytes(s string) (ret []byte) {
 	sep := ","
 	if strings.Index(s, ";") >= 0 {
 		sep = ";"
+	} else if strings.Index(s, "/") >= 0 {
+		sep = "/"
 	}
 	ss := strings.Split(s, sep)
 	sl := len(ss)
@@ -84,12 +86,39 @@ func ParseI32S(s string) (ret []int32) {
 	sep := ","
 	if strings.Index(s, ";") >= 0 {
 		sep = ";"
+	} else if strings.Index(s, "/") >= 0 {
+		sep = "/"
 	}
 	ss := strings.Split(s, sep)
 	sl := len(ss)
 	ret = make([]int32, sl)
 	for i := 0; i < sl; i++ {
 		ret[i] = ParseI32(ss[i], 0)
+	}
+	return
+}
+
+// ParseIS 使用;将字符串分隔成[]int32
+func ParseIS(s string) (ret []int) {
+	if s == "" {
+		return
+	}
+	sep := ","
+	if strings.Index(s, ";") >= 0 {
+		sep = ";"
+	} else if strings.Index(s, "/") >= 0 {
+		sep = "/"
+	}
+	ss := strings.Split(s, sep)
+	sl := len(ss)
+	ret = make([]int, sl)
+	for i := 0; i < sl; i++ {
+		v, err := strconv.Atoi(ss[i])
+		if err != nil {
+			ret[i] = 0
+		} else {
+			ret[i] = v
+		}
 	}
 	return
 }
@@ -111,6 +140,8 @@ func ParseI64S(s string) (ret []int64) {
 	sep := ","
 	if strings.Index(s, ";") >= 0 {
 		sep = ";"
+	} else if strings.Index(s, "/") >= 0 {
+		sep = "/"
 	}
 	ss := strings.Split(s, sep)
 	sl := len(ss)
@@ -138,6 +169,8 @@ func ParseU32S(s string) (ret []uint32) {
 	sep := ","
 	if strings.Index(s, ";") >= 0 {
 		sep = ";"
+	} else if strings.Index(s, "/") >= 0 {
+		sep = "/"
 	}
 	ss := strings.Split(s, sep)
 	sl := len(ss)
@@ -165,6 +198,8 @@ func ParseU64S(s string) (ret []uint64) {
 	sep := ","
 	if strings.Index(s, ";") >= 0 {
 		sep = ";"
+	} else if strings.Index(s, "/") >= 0 {
+		sep = "/"
 	}
 	ss := strings.Split(s, sep)
 	sl := len(ss)
@@ -192,6 +227,8 @@ func ParseF32S(s string) (ret []float32) {
 	sep := ","
 	if strings.Index(s, ";") >= 0 {
 		sep = ";"
+	} else if strings.Index(s, "/") >= 0 {
+		sep = "/"
 	}
 	ss := strings.Split(s, sep)
 	sl := len(ss)
@@ -219,6 +256,8 @@ func ParseF64S(s string) (ret []float64) {
 	sep := ","
 	if strings.Index(s, ";") >= 0 {
 		sep = ";"
+	} else if strings.Index(s, "/") >= 0 {
+		sep = "/"
 	}
 	ss := strings.Split(s, sep)
 	sl := len(ss)
@@ -243,6 +282,8 @@ func ParseBools(s string) (ret []bool) {
 	sep := ","
 	if strings.Index(s, ";") >= 0 {
 		sep = ";"
+	} else if strings.Index(s, "/") >= 0 {
+		sep = "/"
 	}
 	ss := strings.Split(s, sep)
 	sl := len(ss)

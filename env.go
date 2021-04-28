@@ -12,16 +12,17 @@ import (
 var env struct {
 	// 配置信息
 	config struct {
-		Name        string
-		Address     string
-		Registry    string
-		AssetsCache bool
-		Expired     int
-		Mask        string
-		DBResource  string
-		UserTabName string
-		DBSQLs      []string
-		LogFlags    byte // lDebug/lLog/lError
+		Name        string   // 服务名称
+		Address     string   // 监听地址
+		Registry    string   // 注册机地址
+		AssetsCache bool     // web资源是否需要缓存
+		Expired     int      // Session过期时间
+		Mask        string   // 通信掩码
+		OpenAt      string   // 开服时间
+		DBResource  string   // 数据源
+		UserTabName string   // 玩家基础数据存储名称
+		DBSQLs      []string // 需要执行的SQL
+		LogFlags    byte     // lDebug/lLog/lError
 	}
 
 	// 校验码
