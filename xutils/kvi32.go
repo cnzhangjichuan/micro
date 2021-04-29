@@ -214,10 +214,17 @@ func (s *SI32) Get(x int) (string, int32) {
 	return s.str[x], s.i32[x]
 }
 
-// Set 设置指定位置的数据
-func (s *SI32) Set(x int, v int32) {
+// SetValue 设置指定位置的数据
+func (s *SI32) SetValue(x int, v int32) {
 	if 0 <= x && x < len(s.i32) {
 		s.i32[x] = v
+	}
+}
+
+// SetName 设置指定位置的键名
+func (s *SI32) SetName(x int, n string) {
+	if 0 <= x && x < len(s.str) {
+		s.str[x] = n
 	}
 }
 
