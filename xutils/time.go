@@ -82,8 +82,8 @@ func TodaySec() int32 {
 	return overSeconds(Now())
 }
 
-// SecondsToTomorrow 距离明天的秒数
-func SecondsToTomorrow() int32 {
+// SecondsTomorrow 距离明天的秒数
+func SecondsTomorrow() int32 {
 	sec := overSeconds(Now())
 	if sec <= seDayAt {
 		return seDayAt - sec

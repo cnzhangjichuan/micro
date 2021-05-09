@@ -161,11 +161,9 @@ func (c *chunk) Load(v Serializable, k string) (ok bool) {
 
 	// 没有缓存，从磁盘加载
 	ok = c.loadFromDisk(v, k)
-	if ok {
-		c.Lock()
-		c.put(k, v, false)
-		c.Unlock()
-	}
+	c.Lock()
+	c.put(k, v, false)
+	c.Unlock()
 	return
 }
 

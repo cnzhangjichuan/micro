@@ -87,7 +87,7 @@ func (h *http) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 		} else {
 			// 是否支持zlib
 			v := pack.DataBetween(httpAcceptEncoding, httpRowAt)
-			isZlib := bytes.Index(v, httpAcceptGzlib) >= 0
+			isZlib := bytes.Index(v, httpAcceptZib) >= 0
 			// api
 			api := pack.HTTPHeaderValue(httpAPI)
 			if api != "" {
@@ -320,7 +320,7 @@ func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZ
 			pack.Write(httpRespOk404)
 			// 文档类型
 			h.setContentType(pack, path)
-			pack.Write(httpRespAccpetRanges)
+			pack.Write(httpRespAcceptRanges)
 			pack.Write(httpRespContent0)
 			if isClosed {
 				pack.Write(httpConnectionClose)
@@ -337,7 +337,7 @@ func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZ
 			pack.Write(httpRespOk404)
 			// 文档类型
 			h.setContentType(pack, path)
-			pack.Write(httpRespAccpetRanges)
+			pack.Write(httpRespAcceptRanges)
 			pack.Write(httpRespContent0)
 			if isClosed {
 				pack.Write(httpConnectionClose)
@@ -365,7 +365,7 @@ func (h *http) sendResource(conn net.Conn, pack *packet.Packet, path string, isZ
 			// 200
 			pack.Write(httpRespOk)
 			h.setContentType(pack, path)
-			pack.Write(httpRespAccpetRanges)
+			pack.Write(httpRespAcceptRanges)
 		}
 		pack.Write(httpContentLength)
 		pack.Write(xutils.ParseIntToBytes(fSize))

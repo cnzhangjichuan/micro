@@ -345,7 +345,7 @@ func (w *websocket) handshake(conn net.Conn, pack *packet.Packet) (uid string, i
 func (w *websocket) encodingResponseData(pack *packet.Packet, api string, v interface{}, isCompress bool) {
 	pack.Reset()
 	pack.Allocate(10)
-	pack.EncodeJSONWithAPI(v, isCompress, isCompress, xutils.UnsafeStringToBytes(api))
+	pack.EncodeJSONApi(v, isCompress, isCompress, xutils.UnsafeStringToBytes(api))
 	size := pack.Size() - 10
 	prefix := pack.Slice(0, 10)
 
