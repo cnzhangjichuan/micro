@@ -47,7 +47,7 @@ func (c *uploader) Handle(conn net.Conn, name string, pack *packet.Packet) bool 
 	}
 
 	// 接收body体
-	if err := pack.ReadHTTPBodyStream(conn); err != nil {
+	if err := pack.ReadHTTPStream(conn); err != nil {
 		pack.BeginWrite()
 		pack.WriteString("invalid body data")
 		pack.EndWrite()

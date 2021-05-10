@@ -14,16 +14,16 @@ import (
 type rpc struct {
 	baseChain
 
-	msgID          uint64
-	com            sync.RWMutex
-	cos            map[string]net.Conn
-	rem            sync.RWMutex
-	resp           map[uint64]chan *packet.Packet
-	apiWorkerM     sync.RWMutex
-	apiWorkerValid bool
-	apiWorker      [rpcWorkerSize]chan *rpcPackConn
-	dpoPool        sync.Pool
-	packConnPool   sync.Pool
+	msgID       uint64
+	com         sync.RWMutex
+	cos         map[string]net.Conn
+	rem         sync.RWMutex
+	resp        map[uint64]chan *packet.Packet
+	apiRwm      sync.RWMutex
+	apiRunning  bool
+	apiWorkers  [apiWorkerNum]chan *rpcApiWorker
+	apiWorkPool sync.Pool
+	dpoPool     sync.Pool
 }
 
 const (
@@ -38,27 +38,25 @@ var (
 	errRPCTimeout = errors.New("rpc call timeout")
 )
 
-const rpcWorkerSize = 16
-
 // Init 初始化
 func (r *rpc) Init() {
 	r.cos = make(map[string]net.Conn, 16)
-	r.resp = make(map[uint64]chan *packet.Packet, 16)
-	for i := 0; i < rpcWorkerSize; i++ {
-		r.apiWorker[i] = make(chan *rpcPackConn, 512)
-		go func(c <-chan *rpcPackConn) {
-			for p := range c {
-				r.handAPIData(p)
-				r.freePackConn(p)
+	r.resp = make(map[uint64]chan *packet.Packet, 128)
+	for i := 0; i < apiWorkerNum; i++ {
+		r.apiWorkers[i] = make(chan *rpcApiWorker, 128)
+		go func(c <-chan *rpcApiWorker) {
+			for worker := range c {
+				r.doWorker(worker)
+				r.freeApiWorker(worker)
 			}
-		}(r.apiWorker[i])
+		}(r.apiWorkers[i])
 	}
-	r.apiWorkerValid = true
+	r.apiRunning = true
 	r.dpoPool.New = func() interface{} {
 		return &rpcDpo{}
 	}
-	r.packConnPool.New = func() interface{} {
-		return &rpcPackConn{}
+	r.apiWorkPool.New = func() interface{} {
+		return &rpcApiWorker{}
 	}
 }
 
@@ -93,30 +91,20 @@ func (r *rpc) Handle(conn net.Conn, name string, pack *packet.Packet) bool {
 		return true
 	}
 
-	// 注册连接
-	r.com.Lock()
-	r.cos[address] = conn
-	r.com.Unlock()
-
 	// 处理数据
 	r.receive(conn)
-
-	// 注销连接
-	r.com.Lock()
-	delete(r.cos, address)
-	r.com.Unlock()
 
 	return true
 }
 
 // Close 关闭
 func (r *rpc) Close() {
-	r.apiWorkerM.Lock()
-	r.apiWorkerValid = false
-	for i := 0; i < rpcWorkerSize; i++ {
-		close(r.apiWorker[i])
+	r.apiRwm.Lock()
+	r.apiRunning = false
+	for i := 0; i < apiWorkerNum; i++ {
+		close(r.apiWorkers[i])
 	}
-	r.apiWorkerM.Unlock()
+	r.apiRwm.Unlock()
 }
 
 // Call 远程调用
@@ -127,11 +115,11 @@ func (r *rpc) Call(out, in interface{}, adr, api string) error {
 	)
 
 	// 获取连接
-	conn, err := r.GetConn(adr)
+	conn, err := r.createOrGetConn(adr)
 	if err != nil {
 		return err
 	}
-
+	
 	// 组装数据
 	pack := packet.New(1024)
 	pack.SetTimeout(RT, WT)
@@ -193,8 +181,8 @@ func (r *rpc) Call(out, in interface{}, adr, api string) error {
 	return err
 }
 
-// GetConn 获取连接
-func (r *rpc) GetConn(adr string) (conn net.Conn, err error) {
+// createOrGetConn 获取连接
+func (r *rpc) createOrGetConn(adr string) (conn net.Conn, err error) {
 	const TIMEOUT = time.Second * 3
 
 	ok := false
@@ -272,7 +260,7 @@ func (r *rpc) receive(conn net.Conn) {
 
 	pack := packet.New(1024)
 	pack.SetTimeout(RT, WT)
-	for r.apiWorkerValid {
+	for r.apiRunning {
 		code, err := pack.ReadConnWithKeepAlive(conn)
 		if err != nil {
 			break
@@ -291,44 +279,27 @@ func (r *rpc) receive(conn net.Conn) {
 			r.rem.RUnlock()
 		case rpcCodeRequest:
 			// request
-			r.apiWorkerM.RLock()
-			if r.apiWorkerValid {
-				pc := r.createPackConn()
-				pc.pack = pack.Copy()
-				pc.pack.SetTimeout(RT, WT)
-				pc.conn = conn
-				select {
-				case r.apiWorker[0] <- pc:
-				case r.apiWorker[1] <- pc:
-				case r.apiWorker[2] <- pc:
-				case r.apiWorker[3] <- pc:
-				case r.apiWorker[4] <- pc:
-				case r.apiWorker[5] <- pc:
-				case r.apiWorker[6] <- pc:
-				case r.apiWorker[7] <- pc:
-				case r.apiWorker[8] <- pc:
-				case r.apiWorker[9] <- pc:
-				case r.apiWorker[10] <- pc:
-				case r.apiWorker[11] <- pc:
-				case r.apiWorker[12] <- pc:
-				case r.apiWorker[13] <- pc:
-				case r.apiWorker[14] <- pc:
-				case r.apiWorker[15] <- pc:
-				}
+			r.apiRwm.RLock()
+			if r.apiRunning {
+				worker := r.createApiWorker()
+				worker.pack = pack.Copy()
+				worker.pack.SetTimeout(RT, WT)
+				worker.conn = conn
+				r.addWorker(worker)
 			}
-			r.apiWorkerM.RUnlock()
+			r.apiRwm.RUnlock()
 		}
 	}
 	packet.Free(pack)
 }
 
-// handAPIData 处理数据
-func (r *rpc) handAPIData(pc *rpcPackConn) {
+// doWorker 处理数据
+func (r *rpc) doWorker(worker *rpcApiWorker) {
 	var (
 		resp    interface{}
 		errCode string
-		msgID   = pc.pack.ReadU64()
-		api     = pc.pack.ReadString()
+		msgID   = worker.pack.ReadU64()
+		api     = worker.pack.ReadString()
 	)
 
 	f, ok := findRps(api)
@@ -336,56 +307,81 @@ func (r *rpc) handAPIData(pc *rpcPackConn) {
 		errCode = apiNotFoundError.ErrCode
 	} else {
 		dpo := r.createDpo()
-		dpo.pack = pc.pack
+		dpo.pack = worker.pack
 		resp, errCode = f(dpo)
 		r.freeDpo(dpo)
 	}
 
 	// response
-	pc.pack.BeginWrite()
-	pc.pack.WriteU32(rpcCodeResponse)
-	pc.pack.WriteU64(msgID)
+	worker.pack.BeginWrite()
+	worker.pack.WriteU32(rpcCodeResponse)
+	worker.pack.WriteU64(msgID)
 	if errCode != "" {
 		// 发送错误码
-		pc.pack.WriteU32(rpcCodeDataERR)
-		pc.pack.WriteString(errCode)
+		worker.pack.WriteU32(rpcCodeDataERR)
+		worker.pack.WriteString(errCode)
 	} else if resp != nil {
 		// 发送数据
-		pc.pack.WriteU32(rpcCodeDataOK)
+		worker.pack.WriteU32(rpcCodeDataOK)
 		if e, ok := resp.(packet.Encoder); ok {
-			e.Encode(pc.pack)
+			e.Encode(worker.pack)
 		} else {
-			pc.pack.EncodeJSON(resp, true, true)
+			worker.pack.EncodeJSON(resp, true, true)
 		}
 	} else {
 		// 空响应
-		pc.pack.WriteU32(rpcCodeDataNil)
+		worker.pack.WriteU32(rpcCodeDataNil)
 	}
-	pc.pack.EndWrite()
+	worker.pack.EndWrite()
 	// 发送数据
-	if pc.conn != nil {
-		pc.pack.FlushToConn(pc.conn)
+	if worker.conn != nil {
+		worker.pack.FlushToConn(worker.conn)
 	}
 }
 
-type rpcPackConn struct {
+// rpcApiWorker rpc业务包
+type rpcApiWorker struct {
 	conn net.Conn
 	pack *packet.Packet
 }
 
-// createPackConn 创建连接包
-func (r *rpc) createPackConn() *rpcPackConn {
-	return r.packConnPool.Get().(*rpcPackConn)
+// createApiWorker 创建业务包
+func (r *rpc) createApiWorker() *rpcApiWorker {
+	return r.apiWorkPool.Get().(*rpcApiWorker)
 }
 
-// freePackConn 释放连接包
-func (r *rpc) freePackConn(p *rpcPackConn) {
-	if p == nil {
+// freeApiWorker 释放业务包
+func (r *rpc) freeApiWorker(worker *rpcApiWorker) {
+	if worker == nil {
 		return
 	}
-	packet.Free(p.pack)
-	p.conn, p.pack = nil, nil
-	r.packConnPool.Put(p)
+	packet.Free(worker.pack)
+	worker.conn, worker.pack = nil, nil
+	r.apiWorkPool.Put(worker)
+}
+
+const apiWorkerNum = 16
+
+// addWorker 添加到工作池中
+func (r *rpc) addWorker(worker *rpcApiWorker) {
+	select {
+	case r.apiWorkers[0] <- worker:
+	case r.apiWorkers[1] <- worker:
+	case r.apiWorkers[2] <- worker:
+	case r.apiWorkers[3] <- worker:
+	case r.apiWorkers[4] <- worker:
+	case r.apiWorkers[5] <- worker:
+	case r.apiWorkers[6] <- worker:
+	case r.apiWorkers[7] <- worker:
+	case r.apiWorkers[8] <- worker:
+	case r.apiWorkers[9] <- worker:
+	case r.apiWorkers[10] <- worker:
+	case r.apiWorkers[11] <- worker:
+	case r.apiWorkers[12] <- worker:
+	case r.apiWorkers[13] <- worker:
+	case r.apiWorkers[14] <- worker:
+	case r.apiWorkers[15] <- worker:
+	}
 }
 
 type rpcDpo struct {

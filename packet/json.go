@@ -1,20 +1,17 @@
 package packet
 
 import (
+	"encoding/json"
 	"io/ioutil"
-
-	jsoniter "github.com/json-iterator/go"
 )
 
-var json = jsoniter.ConfigFastest
-
-// EncodeJSON 序列化对象为json格式的数据
+// EncodeJSON 编码为json字符串
 func (p *Packet) EncodeJSON(v interface{}, isGzip, prefix bool) (bool, error) {
-	return p.EncodeJSONWithAPI(v, isGzip, prefix, nil)
+	return p.EncodeJSONApi(v, isGzip, prefix, nil)
 }
 
-// EncodeJSONWithAPI 序列化对象为json格式的数据
-func (p *Packet) EncodeJSONWithAPI(v interface{}, isGzip, prefix bool, api []byte) (ok bool, err error) {
+// EncodeJSONApi 编码为json字符串
+func (p *Packet) EncodeJSONApi(v interface{}, isGzip, prefix bool, api []byte) (ok bool, err error) {
 	if prefix {
 		p.w++
 	}
@@ -22,15 +19,13 @@ func (p *Packet) EncodeJSONWithAPI(v interface{}, isGzip, prefix bool, api []byt
 	if len(api) > 0 {
 		p.Write(api)
 	}
-	stream := json.BorrowStream(p)
-	stream.WriteVal(v)
-	if stream.Error != nil {
-		json.ReturnStream(stream)
-		err = stream.Error
+
+	data, er := json.Marshal(v)
+	if er != nil {
+		err = er
 		return
 	}
-	stream.Flush()
-	json.ReturnStream(stream)
+	p.Write(data)
 
 	if isGzip {
 		ok = p.Compress(w)
@@ -47,7 +42,7 @@ func (p *Packet) EncodeJSONWithAPI(v interface{}, isGzip, prefix bool, api []byt
 	return
 }
 
-// DecodeJSON 反序列化json数据
+// DecodeJSON json解码
 func (p *Packet) DecodeJSON(v interface{}) error {
 	if p.r >= p.w {
 		return nil

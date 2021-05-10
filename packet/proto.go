@@ -15,13 +15,13 @@ func (p *Packet) WriteString(s string) {
 	l := len(ss)
 
 	// header
-	p.growCap(binary.MaxVarintLen64)
-	n := binary.PutVarint(p.buf[p.w:], int64(l))
+	p.grow(binary.MaxVarintLen64)
+	n := binary.PutVarint(p.buf[p.w:p.w+binary.MaxVarintLen64], int64(l))
 	p.w += n
 
 	// data
-	p.growCap(l)
-	n = copy(p.buf[p.w:], ss)
+	p.grow(l)
+	n = copy(p.buf[p.w:p.w+l], ss)
 	p.w += n
 }
 
@@ -63,7 +63,7 @@ func (p *Packet) ReadStrings() []string {
 
 // WriteU64 写入uint64
 func (p *Packet) WriteU64(x uint64) {
-	p.growCap(binary.MaxVarintLen64)
+	p.grow(binary.MaxVarintLen64)
 	n := binary.PutUvarint(p.buf[p.w:], x)
 	p.w += n
 }
@@ -122,7 +122,7 @@ func (p *Packet) ReadU32S() []uint32 {
 
 // WriteI64 写入int64
 func (p *Packet) WriteI64(x int64) {
-	p.growCap(binary.MaxVarintLen64)
+	p.grow(binary.MaxVarintLen64)
 	n := binary.PutVarint(p.buf[p.w:], x)
 	p.w += n
 }

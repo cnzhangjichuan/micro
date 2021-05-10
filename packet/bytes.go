@@ -69,7 +69,7 @@ func getBytes(n int) []byte {
 		i = -1
 	}
 	if i < 0 {
-		return make([]byte, n)
+		return make([]byte, 0, n)
 	}
 	b := bytesEnv.chunks[i].Get().([]byte)
 	return b[:0]
