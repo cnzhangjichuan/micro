@@ -152,7 +152,7 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 		cac := createDpoCache()
 
 		// 将自身注册到会话中
-		wc := w.createWConn()
+		wc = w.createWConn()
 		wc.uid = uid
 		wc.conn = conn
 		wc.isCompressed = isCompress
@@ -201,7 +201,7 @@ func (w *websocket) Handle(conn net.Conn, name string, pack *packet.Packet) bool
 			return true
 		}
 		cac := createDpoCache()
-		wc := w.createWConn()
+		wc = w.createWConn()
 
 		// 处理数据
 		var payload = make([]byte, 8)
