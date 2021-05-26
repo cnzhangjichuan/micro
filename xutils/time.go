@@ -98,7 +98,7 @@ func SecondsPastOpeningTime(days int32) int32 {
 
 // SecondsFutureOpeningTime 距离下一个开放时间点的秒数
 func SecondsFutureOpeningTime(days int32) int32 {
-	return int32(openingTime.Add(dayDuration*time.Duration(days)).Unix() - NowSec())
+	return int32(openingTime.Add(dayDuration*time.Duration(days-1)).Unix() - NowSec())
 }
 
 // ParseTime 时间转换

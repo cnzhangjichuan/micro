@@ -2,6 +2,7 @@ package packet
 
 import (
 	"encoding/binary"
+	"errors"
 	"hash/crc32"
 	"runtime"
 	"sync"
@@ -26,8 +27,10 @@ func NewCache(expired time.Duration, saver Saver) Cache {
 
 // Cache 数据缓存
 type Cache interface {
+	InitFromDisk(Serializable) error
 	Has(string) bool
 	WalkDisk(interface{}, func(string, interface{})) error
+	WalkCache(Serializable, func() bool)
 	Load(Serializable, string) bool
 	Put(string, Serializable)
 	Del(string)
@@ -59,13 +62,50 @@ func (c *cache) Has(key string) bool {
 	return c.cks[hashCode32(key)%c.cze].Has(key)
 }
 
+// InitFromDisk 从磁盘上初始化数据
+func (c *cache) InitFromDisk(dataInstance Serializable) error {
+	return c.WalkDisk(dataInstance, func(id string, data interface{}) {
+		idx := hashCode32(id) % c.cze
+		c.cks[idx].Lock()
+		c.cks[idx].put(id, dataInstance, false)
+		c.cks[idx].Unlock()
+	})
+}
+
+var nSetSaver = errors.New(`no saver settings`)
+
 // WalkDisk 迭代数据
 func (c *cache) WalkDisk(data interface{}, p func(string, interface{})) error {
 	s := c.cks[0].saver
-	if s != nil {
-		return s.Walk(data, p)
+	if s == nil {
+		return nSetSaver
 	}
-	return nil
+	return s.Walk(data, p)
+}
+
+// WalkCache 迭代缓存数据
+func (c *cache) WalkCache(data Serializable, p func() bool) {
+	skip := false
+	for i := uint32(0); i < c.cze; i++ {
+		c.cks[i].RLock()
+		for _, v := range c.cks[i].m {
+			pack := NewWithData(v)
+			if c.cks[i].expired > 0 {
+				pack.Seek(4, -1)
+			}
+			data.Decode(pack)
+			pack.buf = nil
+			Free(pack)
+			if p() {
+				skip = true
+				break
+			}
+		}
+		c.cks[i].RUnlock()
+		if skip {
+			break
+		}
+	}
 }
 
 // Load 从缓存中加载数据

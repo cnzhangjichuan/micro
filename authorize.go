@@ -94,7 +94,7 @@ func (a *authorize) Check(as string) (code string, ok bool) {
 
 	// check vCode
 	now := uint64(time.Now().Unix())
-	dsw := now - 3
+	dsw := now - 6
 	for i := now; i >= dsw; i-- {
 		pack.Seek(0, sdx)
 		binary.BigEndian.PutUint64(pack.Allocate(8), i)

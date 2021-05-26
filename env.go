@@ -23,6 +23,7 @@ var env struct {
 		UserTabName string   // 玩家基础数据存储名称
 		DBSQLs      []string // 需要执行的SQL
 		LogFlags    byte     // lDebug/lLog/lError
+		Extra       []string // 扩展参数
 	}
 
 	// 校验码
@@ -60,6 +61,21 @@ var env struct {
 	// 日志
 	log      *log.Logger
 	logFlags byte
+}
+
+// Name 服器名称
+func Name() string {
+	return env.config.Name
+}
+
+// 获取扩展参数
+func GetExtra(name string) string {
+	for i, l := 1, len(env.config.Extra); i < l; i += 2 {
+		if env.config.Extra[i-1] == name {
+			return env.config.Extra[i]
+		}
+	}
+	return ``
 }
 
 func init() {
