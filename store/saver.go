@@ -132,6 +132,17 @@ func (s *saver) walk(data interface{}, p func(string, interface{}), idx int) err
 	return nil
 }
 
+// Remove 删除数据
+func (s *saver) Remove(id string) bool {
+	if s == nil {
+		return false
+	}
+
+	return ExecuteNow(strings.Join([]string{
+		`delete from `, s.name, tableSuffix(id), ` where id='`, Ignore(id), `'`,
+	}, "")) == nil
+}
+
 // NewSingleSaver 创建单表加载器
 func NewSingleSaver(name string) *singleSaver {
 	if name == "" {

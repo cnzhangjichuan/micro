@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"hash/crc32"
+	"math/rand"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -34,6 +35,7 @@ type Cache interface {
 	Load(Serializable, string) bool
 	Put(string, Serializable)
 	Del(string)
+	Remove(string)
 	Update(Serializable, string, func() bool, func())
 }
 
@@ -47,6 +49,9 @@ type Saver interface {
 
 	// Walk 从数据表中迭代数据
 	Walk(interface{}, func(string, interface{})) error
+
+	// Remove 删除数据
+	Remove(string) bool
 }
 
 type cache struct {
@@ -86,7 +91,7 @@ func (c *cache) WalkDisk(data interface{}, p func(string, interface{})) error {
 // WalkCache 迭代缓存数据
 func (c *cache) WalkCache(data Serializable, p func() bool) {
 	skip := false
-	for i := uint32(0); i < c.cze; i++ {
+	for _, i := range rand.Perm(int(c.cze)) {
 		c.cks[i].RLock()
 		for _, v := range c.cks[i].m {
 			pack := NewWithData(v)
@@ -138,6 +143,14 @@ func (c *cache) Del(key string) {
 		return
 	}
 	c.cks[hashCode32(key)%c.cze].Del(key)
+}
+
+// Remove 彻底删除数据
+func (c *cache) Remove(key string) {
+	if key == "" {
+		return
+	}
+	c.cks[hashCode32(key)%c.cze].Remove(key)
 }
 
 // hashCode32 计算string的hash码
@@ -273,6 +286,19 @@ func (c *chunk) Del(k string) {
 	if pack, ok := c.m[k]; ok {
 		delete(c.m, k)
 		putBytes(pack)
+	}
+	c.Unlock()
+}
+
+// Remove 彻底删除数据
+func (c *chunk) Remove(k string) {
+	c.Lock()
+	if pack, ok := c.m[k]; ok {
+		delete(c.m, k)
+		putBytes(pack)
+		if c.saver != nil {
+			c.saver.Remove(k)
+		}
 	}
 	c.Unlock()
 }

@@ -118,6 +118,13 @@ func FormatNow() string {
 	return time.Now().Format(layout)
 }
 
+// FormatTimestamp
+func FormatTimestamp(timestamp int64) string {
+	const layout = `2006/01/02`
+
+	return time.Unix(timestamp, 0).Format(layout)
+}
+
 // DayInMonth 月中第几天
 func DaysOfMonth() int32 {
 	return int32(Now().Day())
