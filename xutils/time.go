@@ -125,6 +125,12 @@ func FormatTimestamp(timestamp int64) string {
 	return time.Unix(timestamp, 0).Format(layout)
 }
 
+// GetAfterDaysDate 获取指定天数后的时间字符串
+func GetAfterDaysDate(days int32) string {
+	const Layout = `2006/01/02 15:04`
+	return openingTime.Add(time.Duration(days*24) * time.Hour).Format(Layout)
+}
+
 // DayInMonth 月中第几天
 func DaysOfMonth() int32 {
 	return int32(Now().Day())

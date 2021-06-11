@@ -238,6 +238,11 @@ func (s *SI32) GetValue(name string) int32 {
 	return 0
 }
 
+// Index 获取数据所在位置
+func (s *SI32) Index(name string) int {
+	return IndexStrings(s.str, name)
+}
+
 // Reset 重置
 func (s *SI32) Reset() {
 	if len(s.str) > 0 {

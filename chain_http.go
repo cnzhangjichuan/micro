@@ -179,6 +179,7 @@ func (h *http) processThirdPartRequest(conn net.Conn, pack *packet.Packet, api, 
 			pack.Write(httpRowAt)
 		} else {
 			e := pack.Size()
+			pack.Write(httpRespJSON)
 			pack.Write(httpContentLength)
 			pack.Write(xutils.ParseIntToBytes(int64(e - s)))
 			pack.Write(httpRowAt)

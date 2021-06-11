@@ -39,6 +39,16 @@ func (s *SS) GetValues() []string {
 	return s.v
 }
 
+// HasAny 是否包含任一元素
+func (s *SS) HasAny(ss []string) bool {
+	for _, v := range ss {
+		if HasString(s.v, v) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *SS) Len() int {
 	return len(s.v)
 }
@@ -352,6 +362,59 @@ func (s *F32S) Get(x int) (float32, bool) {
 }
 
 func (s *F32S) Len() int {
+	return len(s.v)
+}
+
+// FF32 整型数组
+type FF32 struct {
+	v []float32
+}
+
+// Parse 解析数据
+func (s *FF32) Parse(nv string) {
+	if strings.Index(nv, ";") >= 0 {
+		for _, v := range strings.Split(nv, ";") {
+			s.v = append(s.v, ParseF32(v, 0))
+		}
+	} else {
+		for _, v := range strings.Split(nv, ",") {
+			s.v = append(s.v, ParseF32(v, 0))
+		}
+	}
+}
+
+// Get 获取数据
+func (s *FF32) Get(x int) (float32, bool) {
+	l := len(s.v)
+	if l == 0 {
+		return 0, false
+	}
+	if x < 0 {
+		return s.v[0], false
+	}
+
+	ok := true
+	if x >= l {
+		x = l - 1
+		ok = false
+	}
+	return s.v[x], ok
+}
+
+// GetValues 返回所有数据
+func (s *FF32) GetValues() []float32 {
+	return s.v
+}
+
+// Sum 反回总和
+func (s *FF32) Sum() (ret float32) {
+	for _, v := range s.v {
+		ret += v
+	}
+	return
+}
+
+func (s *FF32) Len() int {
 	return len(s.v)
 }
 
